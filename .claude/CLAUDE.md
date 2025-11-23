@@ -40,9 +40,9 @@
 ## Recomendações para criação de projetos didáticos
 
 - Focar na didática, aprendizado e explicação.
-- considerar no detalhe o contexto dos resumos das aulas.
+- considerar nos mínimos detalhes o contexto dos resumos das aulas.
 - Seguir as melhores práticas (use context7 - mcp). Também vale consultas na web em fontes oficias e de confiança.
-- Sequenciar e fornecer passo a passo (caso necessário, crie um arquivo .md para facilitar e registrar).
+- Sequenciar e fornecer passo a passo detalhado (crie um arquivo .md para facilitar e registrar).
 - Explicar cada comando de terminal necessário para implementação dos projetos didáticos.
 - Explicação breve e linha por linha dos arquivos `.yaml` através de comentários.
 

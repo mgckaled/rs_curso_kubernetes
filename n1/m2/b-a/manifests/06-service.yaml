@@ -1,0 +1,62 @@
+# =============================================================================
+# Service - Exposição e descoberta de Pods
+# =============================================================================
+# O Service fornece um endpoint estável para acessar os Pods.
+# Funciona como um load balancer interno, distribuindo tráfego entre réplicas.
+#
+# Tipos de Service:
+# - ClusterIP: acesso interno no cluster (padrão)
+# - NodePort: expõe em porta fixa em todos os nodes
+# - LoadBalancer: provisiona load balancer externo (cloud)
+# - ExternalName: alias DNS para serviço externo
+# =============================================================================
+
+# Versão da API para Services
+apiVersion: v1
+
+# Tipo do recurso
+kind: Service
+
+# Metadados do Service
+metadata:
+  # Nome do Service - usado para descoberta DNS
+  # Pods podem acessar via: demo-api-service.demo.svc.cluster.local
+  # Ou simplesmente: demo-api-service (dentro do mesmo namespace)
+  name: demo-api-service
+
+  # Namespace onde o Service será criado
+  namespace: demo
+
+  # Labels para organização
+  labels:
+    app.kubernetes.io/name: demo-api
+    app.kubernetes.io/component: service
+
+# Especificação do Service
+spec:
+  # Tipo do Service
+  # ClusterIP: IP virtual interno, acessível apenas dentro do cluster
+  type: ClusterIP
+
+  # Seletor - define quais Pods receberão tráfego
+  # O Service roteia para TODOS os pods que correspondem a estes labels
+  # Isso inclui pods de diferentes Deployments se tiverem o mesmo label
+  selector:
+    app.kubernetes.io/name: demo-api
+
+  # Portas expostas pelo Service
+  ports:
+    # Configuração da porta HTTP
+    - name: http
+      # Protocolo de rede
+      protocol: TCP
+      # Porta do Service (onde clientes se conectam)
+      port: 80
+      # Porta do container (onde o tráfego é direcionado)
+      # Pode ser número ou nome da porta definida no container
+      targetPort: http
+
+  # Política de sessão
+  # None: cada request pode ir para qualquer pod (padrão)
+  # ClientIP: requests do mesmo IP vão para o mesmo pod
+  sessionAffinity: None

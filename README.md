@@ -1,6 +1,6 @@
 # Formação Kubernetes
 
-Repositório de estudos para a Formação em Kubernetes da Rocketseat.
+Repositório pessoal de registro, referência e suporte para fins de aprendizado, consulta e acompanhamento do Curso de Formação em Kuberbetes, desenvolvido pela Faculdade de Tecnologia Rocketseat (FTR).
 
 ---
 
@@ -21,3 +21,14 @@ Prática com os principais objetos do Kubernetes: Pods, Namespaces, ReplicaSets,
 
 - **Projeto:** [`n1/m1/b-b/`](./n1/m1/b-b/)
 - **Conteúdo:** Manifests YAML comentados (namespace, pod, replicaset, deployment, service)
+
+---
+
+### Módulo 2 - Aprofundando no Workloads e Configurações
+
+#### Bloco A - Explorando Deployment e Cenários em uma Aplicação Real
+
+Deploy de aplicação NestJS com estratégias de atualização (RollingUpdate e Recreate), uso de ConfigMap para variáveis não sensíveis, Secret para dados confidenciais, e práticas de rollback e versionamento.
+
+- **Projeto:** [`n1/m2/b-a/`](./n1/m2/b-a/)
+- **Conteúdo:** Namespace, ConfigMap, Secret, Deployment (RollingUpdate/Recreate), Service ClusterIP

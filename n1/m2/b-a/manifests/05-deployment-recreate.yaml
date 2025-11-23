@@ -1,0 +1,106 @@
+# =============================================================================
+# Deployment - Estratégia Recreate (com downtime)
+# =============================================================================
+# A estratégia Recreate termina TODOS os pods antes de criar novos.
+# Isso causa indisponibilidade durante a atualização!
+#
+# Quando usar Recreate:
+# - Aplicações que não suportam múltiplas versões simultâneas
+# - Recursos exclusivos (ex: volume RWO que só permite um pod)
+# - Migrações de banco que exigem versão única
+# - Ambientes de desenvolvimento onde downtime não importa
+#
+# Quando NÃO usar:
+# - Produção com requisitos de alta disponibilidade
+# - APIs que não podem ter downtime
+# =============================================================================
+
+# Versão da API para Deployments
+apiVersion: apps/v1
+
+# Tipo do recurso
+kind: Deployment
+
+# Metadados do Deployment
+metadata:
+  # Nome diferente para coexistir com o deployment RollingUpdate
+  # Em produção, você teria apenas um deployment
+  name: demo-api-recreate
+
+  # Namespace onde será criado
+  namespace: demo
+
+  # Labels identificadores
+  labels:
+    app.kubernetes.io/name: demo-api-recreate
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: api
+
+  # Annotation para histórico de rollout
+  annotations:
+    kubernetes.io/change-cause: "Deploy inicial com estratégia Recreate"
+
+# Especificação do Deployment
+spec:
+  # Número de réplicas
+  replicas: 2
+
+  # Histórico de revisões para rollback
+  revisionHistoryLimit: 3
+
+  # Seletor - DEVE corresponder aos labels do template
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demo-api-recreate
+
+  # ==========================================================================
+  # ESTRATÉGIA RECREATE
+  # ==========================================================================
+  # Diferente do RollingUpdate, o Recreate não tem configurações adicionais.
+  # O comportamento é simples:
+  # 1. Todos os pods existentes são terminados
+  # 2. Após todos terminarem, os novos pods são criados
+  # 3. Não há sobreposição entre versões
+  # ==========================================================================
+  strategy:
+    type: Recreate
+    # Nota: não há seção "recreate:" - não existem opções configuráveis
+
+  # Template do Pod
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demo-api-recreate
+        app.kubernetes.io/version: "1.0.0"
+
+    spec:
+      containers:
+        - name: demo-api
+          image: demo-api:v1
+          imagePullPolicy: Never
+
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          # Injeta variáveis do ConfigMap e Secret
+          envFrom:
+            - configMapRef:
+                name: demo-api-config
+            - secretRef:
+                name: demo-api-secret
+
+          # Recursos (menores para demonstração)
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+
+      # Tempo para graceful shutdown
+      terminationGracePeriodSeconds: 10
+
+      restartPolicy: Always

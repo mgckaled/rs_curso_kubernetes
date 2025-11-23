@@ -1,0 +1,45 @@
+# =============================================================================
+# ConfigMap - Armazenamento de configurações não sensíveis
+# =============================================================================
+# ConfigMaps permitem desacoplar configurações da imagem do container.
+# Use para: URLs de serviços, feature flags, configurações de ambiente.
+# NÃO use para: senhas, tokens, chaves API (use Secret).
+# =============================================================================
+
+# Versão da API do Kubernetes para este recurso
+apiVersion: v1
+
+# Tipo do recurso - ConfigMap para dados de configuração
+kind: ConfigMap
+
+# Metadados do recurso
+metadata:
+  # Nome do ConfigMap - será referenciado no Deployment
+  name: demo-api-config
+
+  # Namespace onde o ConfigMap será criado
+  # Deve existir antes de aplicar este manifest
+  namespace: demo
+
+  # Labels para organização
+  labels:
+    app.kubernetes.io/name: demo-api
+    app.kubernetes.io/component: config
+
+# Dados de configuração em formato chave: valor
+# Todos os valores são strings (mesmo números)
+data:
+  # Nome da aplicação - exibido no endpoint /env
+  APP_NAME: "demo-api"
+
+  # Ambiente de execução (development, staging, production)
+  APP_ENV: "development"
+
+  # Nível de log (debug, info, warn, error)
+  LOG_LEVEL: "debug"
+
+  # Porta onde a aplicação escuta (informativo)
+  PORT: "3000"
+
+  # Configuração de feature flag exemplo
+  FEATURE_STRESS_ENABLED: "true"

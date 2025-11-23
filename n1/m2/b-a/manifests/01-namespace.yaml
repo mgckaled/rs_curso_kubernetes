@@ -1,0 +1,27 @@
+# =============================================================================
+# Namespace - Isolamento lógico de recursos no cluster
+# =============================================================================
+# O Namespace cria um escopo virtual que separa recursos de diferentes
+# projetos/equipes. Permite aplicar políticas de quota, RBAC e network policies.
+# =============================================================================
+
+# Versão da API do Kubernetes para este recurso
+apiVersion: v1
+
+# Tipo do recurso - Namespace para isolamento lógico
+kind: Namespace
+
+# Metadados do recurso
+metadata:
+  # Nome único do namespace no cluster
+  # Convenção: usar nomes curtos e descritivos em lowercase
+  name: demo
+
+  # Labels para organização e seleção de recursos
+  labels:
+    # Indica o nome da aplicação/projeto
+    app.kubernetes.io/name: demo-api
+    # Indica o ambiente (dev, staging, production)
+    environment: development
+    # Label customizado para identificar o módulo do curso
+    module: m2-bloco-a

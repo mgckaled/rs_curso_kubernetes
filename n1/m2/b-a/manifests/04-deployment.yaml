@@ -1,0 +1,145 @@
+# =============================================================================
+# Deployment - Gerenciamento declarativo de Pods com RollingUpdate
+# =============================================================================
+# O Deployment gerencia ReplicaSets que, por sua vez, gerenciam Pods.
+# Estratégia RollingUpdate: atualiza pods gradualmente sem downtime.
+# Ideal para: aplicações stateless que precisam de alta disponibilidade.
+# =============================================================================
+
+# Versão da API - apps/v1 é a versão estável para Deployments
+apiVersion: apps/v1
+
+# Tipo do recurso - Deployment para gerenciamento de réplicas
+kind: Deployment
+
+# Metadados do Deployment
+metadata:
+  # Nome único do Deployment no namespace
+  name: demo-api
+
+  # Namespace onde o Deployment será criado
+  namespace: demo
+
+  # Labels do próprio Deployment (não dos Pods)
+  labels:
+    app.kubernetes.io/name: demo-api
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: api
+
+  # Annotations para documentação e ferramentas
+  annotations:
+    # Descrição do recurso
+    description: "API de demonstração para testes de Kubernetes"
+    # Registra motivo da mudança (útil para rollout history)
+    kubernetes.io/change-cause: "Deploy inicial v1"
+
+# Especificação do Deployment
+spec:
+  # Número de réplicas (pods) desejadas
+  # O Deployment mantém sempre este número rodando
+  replicas: 3
+
+  # Número de revisões antigas mantidas no histórico
+  # Permite rollback para versões anteriores
+  revisionHistoryLimit: 5
+
+  # Seletor para identificar quais Pods pertencem a este Deployment
+  # DEVE corresponder aos labels em spec.template.metadata.labels
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demo-api
+
+  # Estratégia de atualização dos Pods
+  strategy:
+    # RollingUpdate: atualiza gradualmente (zero downtime)
+    # Recreate: termina todos antes de criar novos (causa downtime)
+    type: RollingUpdate
+
+    # Configurações específicas do RollingUpdate
+    rollingUpdate:
+      # Máximo de pods extras durante atualização
+      # 1 = pode ter até 4 pods (3 + 1) durante update
+      # Pode ser número absoluto ou porcentagem (ex: "25%")
+      maxSurge: 1
+
+      # Máximo de pods indisponíveis durante atualização
+      # 0 = sempre manter pelo menos 3 pods disponíveis
+      # Pode ser número absoluto ou porcentagem (ex: "25%")
+      maxUnavailable: 0
+
+  # Template do Pod - define como cada Pod será criado
+  template:
+    # Metadados do Pod (não do Deployment)
+    metadata:
+      # Labels aplicados a cada Pod criado
+      # DEVE incluir os labels do selector
+      labels:
+        app.kubernetes.io/name: demo-api
+        app.kubernetes.io/version: "1.0.0"
+
+      # Annotations do Pod
+      annotations:
+        # Prometheus scrape config (exemplo)
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+
+    # Especificação do Pod
+    spec:
+      # Containers que compõem o Pod
+      containers:
+        # Container principal da aplicação
+        - name: demo-api
+
+          # Imagem Docker a ser utilizada
+          # Para Kind: use nome local (carregado via kind load)
+          # Para produção: use registry completo (ex: docker.io/user/image:tag)
+          image: demo-api:v1
+
+          # Política de pull da imagem
+          # Never: não tenta baixar (usa imagem local do Kind)
+          # Always: sempre baixa (produção com registry)
+          # IfNotPresent: baixa apenas se não existir
+          imagePullPolicy: Never
+
+          # Portas expostas pelo container
+          ports:
+            # Porta HTTP da aplicação
+            - name: http
+              # Porta onde a aplicação escuta dentro do container
+              containerPort: 3000
+              # Protocolo (TCP é o padrão)
+              protocol: TCP
+
+          # Variáveis de ambiente do ConfigMap
+          # envFrom injeta TODAS as chaves do ConfigMap como env vars
+          envFrom:
+            # Referência ao ConfigMap criado anteriormente
+            - configMapRef:
+                name: demo-api-config
+
+            # Referência ao Secret criado anteriormente
+            - secretRef:
+                name: demo-api-secret
+
+          # Recursos computacionais do container
+          resources:
+            # Requests: recursos garantidos (usados no scheduling)
+            requests:
+              # CPU mínima garantida (250 milicores = 0.25 CPU)
+              cpu: "250m"
+              # Memória mínima garantida
+              memory: "256Mi"
+
+            # Limits: recursos máximos permitidos
+            limits:
+              # CPU máxima (500 milicores = 0.5 CPU)
+              cpu: "500m"
+              # Memória máxima (container é killed se exceder)
+              memory: "512Mi"
+
+      # Tempo de espera para terminar gracefully antes de SIGKILL
+      terminationGracePeriodSeconds: 30
+
+      # Política de restart dos containers
+      # Always: sempre reinicia (padrão para Deployments)
+      restartPolicy: Always

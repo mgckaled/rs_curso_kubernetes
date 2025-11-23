@@ -1,0 +1,41 @@
+# =============================================================================
+# Service para Testes de Probes
+# =============================================================================
+# Este Service demonstra como o Readiness Probe afeta o roteamento:
+# - Pod com Readiness OK → IP adicionado aos endpoints do Service
+# - Pod com Readiness FALHA → IP removido dos endpoints
+#
+# Use `kubectl get endpoints` para ver quais pods estão recebendo tráfego
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: demo-api-probes-service
+  namespace: demo
+  labels:
+    app.kubernetes.io/name: demo-api-probes
+    app.kubernetes.io/component: service
+
+spec:
+  type: ClusterIP
+
+  # ==========================================================================
+  # Seletor com múltiplos labels
+  # ==========================================================================
+  # Este service pode rotear para qualquer deployment de probes
+  # Altere o seletor conforme o deployment que deseja testar
+  # ==========================================================================
+  selector:
+    # Pode usar qualquer um dos deployments:
+    # - demo-api-probes (completo)
+    # - demo-api-readiness (foco em readiness)
+    # - demo-api-liveness (foco em liveness)
+    app.kubernetes.io/name: demo-api-probes
+
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

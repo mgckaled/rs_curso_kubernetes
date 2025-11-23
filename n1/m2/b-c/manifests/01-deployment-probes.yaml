@@ -1,0 +1,154 @@
+# =============================================================================
+# Deployment com Todas as Probes - Configuração Completa
+# =============================================================================
+# Este deployment demonstra a configuração completa das três probes:
+# - Startup Probe: Verifica se a aplicação iniciou corretamente
+# - Readiness Probe: Verifica se está pronta para receber tráfego
+# - Liveness Probe: Verifica se a aplicação está saudável
+#
+# Ordem de execução:
+# 1. Container inicia
+# 2. Startup Probe verifica inicialização
+# 3. Após Startup passar, Liveness e Readiness começam
+# 4. Readiness OK → Pod adicionado ao Service
+# 5. Liveness monitora continuamente
+# =============================================================================
+
+# Versão da API
+apiVersion: apps/v1
+
+# Tipo do recurso
+kind: Deployment
+
+# Metadados
+metadata:
+  name: demo-api-probes
+  namespace: demo
+  labels:
+    app.kubernetes.io/name: demo-api-probes
+    app.kubernetes.io/component: api
+
+# Especificação do Deployment
+spec:
+  # Número de réplicas
+  replicas: 2
+
+  # Seletor de pods
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demo-api-probes
+
+  # Template do Pod
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demo-api-probes
+
+    spec:
+      containers:
+        - name: demo-api
+          image: demo-api:v1
+          imagePullPolicy: Never
+
+          # Porta do container
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          # Variáveis de ambiente
+          envFrom:
+            - configMapRef:
+                name: demo-api-config
+            - secretRef:
+                name: demo-api-secret
+
+          # ================================================================
+          # STARTUP PROBE - Verifica inicialização da aplicação
+          # ================================================================
+          # Executada ANTES das outras probes
+          # Se falhar: container é reiniciado
+          # Após sucesso: não é mais executada (passa para liveness/readiness)
+          #
+          # Tempo máximo de inicialização = failureThreshold × periodSeconds
+          # Neste caso: 30 × 10 = 300 segundos (5 minutos)
+          # ================================================================
+          startupProbe:
+            # Tipo: HTTP GET
+            httpGet:
+              # Endpoint de health check
+              path: /health
+              # Porta do container
+              port: http
+            # Número de falhas consecutivas antes de reiniciar
+            # 30 tentativas permite até 5 minutos para inicialização
+            failureThreshold: 30
+            # Intervalo entre verificações (segundos)
+            periodSeconds: 10
+
+          # ================================================================
+          # READINESS PROBE - Verifica se pode receber tráfego
+          # ================================================================
+          # Executada após Startup Probe passar
+          # Se falhar: Pod é REMOVIDO do Service (não recebe tráfego)
+          # Se passar novamente: Pod é ADICIONADO ao Service
+          #
+          # Use para: dependências externas, warmup de cache, etc.
+          # ================================================================
+          readinessProbe:
+            # Tipo: HTTP GET
+            httpGet:
+              # Endpoint específico de readiness
+              path: /ready
+              port: http
+            # Tempo antes da primeira verificação
+            # Permite aplicação se estabilizar após startup
+            initialDelaySeconds: 5
+            # Intervalo entre verificações
+            periodSeconds: 5
+            # Timeout para resposta (segundos)
+            timeoutSeconds: 3
+            # Sucessos consecutivos para considerar ready
+            successThreshold: 1
+            # Falhas consecutivas para considerar not-ready
+            failureThreshold: 3
+
+          # ================================================================
+          # LIVENESS PROBE - Verifica se está saudável
+          # ================================================================
+          # Executada após Startup Probe passar
+          # Se falhar: container é REINICIADO
+          #
+          # Use para: detectar deadlocks, memory leaks, bugs que travam
+          # NÃO use para: dependências externas (use readiness)
+          # ================================================================
+          livenessProbe:
+            # Tipo: HTTP GET
+            httpGet:
+              # Endpoint de health check
+              path: /health
+              port: http
+            # Tempo antes da primeira verificação
+            # Importante: deve ser maior que tempo de inicialização
+            initialDelaySeconds: 10
+            # Intervalo entre verificações
+            periodSeconds: 10
+            # Timeout para resposta
+            timeoutSeconds: 3
+            # Falhas consecutivas antes de reiniciar
+            # 3 falhas = 30 segundos de problema antes de restart
+            failureThreshold: 3
+
+          # Recursos
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+      # Tempo para graceful shutdown
+      terminationGracePeriodSeconds: 30
+
+      restartPolicy: Always

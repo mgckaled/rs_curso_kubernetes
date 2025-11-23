@@ -1,0 +1,120 @@
+# =============================================================================
+# Deployment com Foco em Liveness Probe - Auto-recuperação
+# =============================================================================
+# A Liveness Probe detecta se a aplicação está "viva" e saudável:
+# - Probe OK → Container continua rodando
+# - Probe FALHA → Container é REINICIADO
+#
+# Use para detectar:
+# - Deadlocks (aplicação travada)
+# - Memory leaks que causam OOM interno
+# - Bugs que deixam a aplicação em estado inválido
+# - Loops infinitos
+#
+# NÃO use para: verificar dependências externas (use Readiness)
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: demo-api-liveness
+  namespace: demo
+  labels:
+    app.kubernetes.io/name: demo-api-liveness
+    app.kubernetes.io/component: api
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demo-api-liveness
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demo-api-liveness
+
+    spec:
+      containers:
+        - name: demo-api
+          image: demo-api:v1
+          imagePullPolicy: Never
+
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          envFrom:
+            - configMapRef:
+                name: demo-api-config
+            - secretRef:
+                name: demo-api-secret
+
+          # Startup Probe básica
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            failureThreshold: 10
+            periodSeconds: 5
+
+          # Readiness básica
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+
+          # ================================================================
+          # LIVENESS PROBE DETALHADA
+          # ================================================================
+          # O endpoint de liveness deve ser SIMPLES e RÁPIDO:
+          # - Não verificar dependências externas
+          # - Não fazer operações pesadas
+          # - Retornar rapidamente
+          #
+          # Se for muito complexo ou lento:
+          # - Pode causar falsos positivos
+          # - Pode reiniciar containers saudáveis
+          #
+          # Teste com /crash para forçar reinício:
+          # kubectl exec <pod> -- curl http://localhost:3000/crash
+          # ================================================================
+          livenessProbe:
+            httpGet:
+              # Endpoint simples de health check
+              # Apenas verifica se a aplicação responde
+              path: /health
+              port: http
+            # Tempo antes da primeira verificação
+            # IMPORTANTE: deve ser maior que o tempo de startup
+            # Se muito baixo: reinicia antes da aplicação iniciar
+            initialDelaySeconds: 10
+            # Intervalo entre verificações
+            # Muito curto: overhead de verificações
+            # Muito longo: demora para detectar problemas
+            periodSeconds: 10
+            # Timeout para resposta
+            # Se a aplicação não responder neste tempo: falha
+            # Valor baixo pois health check deve ser rápido
+            timeoutSeconds: 3
+            # Número de falhas consecutivas antes de reiniciar
+            # 3 falhas × 10 segundos = 30 segundos de problema
+            # Evita reiniciar por falhas momentâneas
+            failureThreshold: 3
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always

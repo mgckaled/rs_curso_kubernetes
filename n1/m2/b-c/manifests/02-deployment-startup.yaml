@@ -1,0 +1,107 @@
+# =============================================================================
+# Deployment com Foco em Startup Probe - Aplicações Lentas
+# =============================================================================
+# A Startup Probe é essencial para aplicações que demoram para inicializar:
+# - Aplicações Java com JVM warmup
+# - Aplicações que carregam dados em memória
+# - Aplicações com migrações de banco de dados
+# - Aplicações que conectam a múltiplos serviços externos
+#
+# Sem Startup Probe, a Liveness Probe pode reiniciar o container
+# antes da aplicação ter tempo de inicializar!
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: demo-api-startup
+  namespace: demo
+  labels:
+    app.kubernetes.io/name: demo-api-startup
+    app.kubernetes.io/component: api
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demo-api-startup
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demo-api-startup
+
+    spec:
+      containers:
+        - name: demo-api
+          image: demo-api:v1
+          imagePullPolicy: Never
+
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          envFrom:
+            - configMapRef:
+                name: demo-api-config
+            - secretRef:
+                name: demo-api-secret
+
+          # ================================================================
+          # STARTUP PROBE DETALHADA
+          # ================================================================
+          # Configurada para aplicações que podem demorar até 5 minutos
+          #
+          # Cálculo do tempo máximo:
+          # failureThreshold (30) × periodSeconds (10) = 300 segundos
+          #
+          # Durante esse período:
+          # - Liveness e Readiness NÃO são executadas
+          # - Container não é reiniciado por timeout
+          # - Pod fica em estado "Starting"
+          # ================================================================
+          startupProbe:
+            httpGet:
+              # Endpoint que pode ter delay inicial
+              # Use /health/slow?ms=5000 para simular startup de 5s
+              path: /health
+              port: http
+            # Número de falhas toleradas durante startup
+            # Valor alto para aplicações lentas
+            failureThreshold: 30
+            # Intervalo entre verificações
+            periodSeconds: 10
+            # Timeout para cada verificação
+            # Maior que o normal pois startup pode ser lento
+            timeoutSeconds: 5
+
+          # ================================================================
+          # LIVENESS PROBE (após startup)
+          # ================================================================
+          # Só começa após Startup Probe passar
+          # Configuração mais agressiva pois aplicação já inicializou
+          # ================================================================
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            # Sem initialDelaySeconds pois Startup Probe já verificou
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 3
+            # Menos tolerante após startup (aplicação deve estar estável)
+            failureThreshold: 3
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always

@@ -1,0 +1,121 @@
+# =============================================================================
+# Deployment com Exec Probe - Comandos Customizados
+# =============================================================================
+# A Exec Probe executa um comando dentro do container:
+# - Exit code 0 → Probe OK
+# - Exit code != 0 → Probe FALHA
+#
+# Use para:
+# - Verificar existência de arquivos
+# - Executar scripts de verificação customizados
+# - Verificar processos internos
+# - Verificar locks de arquivos
+# - Aplicações que não expõem HTTP
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: demo-api-exec
+  namespace: demo
+  labels:
+    app.kubernetes.io/name: demo-api-exec
+    app.kubernetes.io/component: api
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demo-api-exec
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demo-api-exec
+
+    spec:
+      containers:
+        - name: demo-api
+          image: demo-api:v1
+          imagePullPolicy: Never
+
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          envFrom:
+            - configMapRef:
+                name: demo-api-config
+            - secretRef:
+                name: demo-api-secret
+
+          # ================================================================
+          # STARTUP PROBE com EXEC
+          # ================================================================
+          # Verifica se a aplicação iniciou usando curl interno
+          # Útil quando quer verificar endpoint específico via comando
+          # ================================================================
+          startupProbe:
+            exec:
+              # Comando a ser executado dentro do container
+              # Exit code 0 = sucesso, qualquer outro = falha
+              command:
+                - /bin/sh
+                - -c
+                # curl retorna exit 0 se HTTP 2xx, exit != 0 se falhar
+                - "curl -sf http://localhost:3000/health || exit 1"
+            # Configuração da probe
+            failureThreshold: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+
+          # ================================================================
+          # READINESS PROBE com EXEC
+          # ================================================================
+          # Pode executar script que verifica múltiplas condições
+          # ================================================================
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                # Verifica endpoint de readiness
+                - "curl -sf http://localhost:3000/ready || exit 1"
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 2
+
+          # ================================================================
+          # LIVENESS PROBE com EXEC
+          # ================================================================
+          # Exemplo: verifica se arquivo de health existe
+          # Aplicação pode criar/remover este arquivo para controlar health
+          # ================================================================
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                # Verifica endpoint de health via curl
+                # Alternativa: verificar arquivo
+                # - "test -f /tmp/healthy"
+                - "curl -sf http://localhost:3000/health || exit 1"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always

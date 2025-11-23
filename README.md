@@ -39,3 +39,10 @@ Escalonamento automático com Horizontal Pod Autoscaler: instalação do Metrics
 
 - **Projeto:** [`n1/m2/b-b/`](./n1/m2/b-b/)
 - **Conteúdo:** Metrics Server, HPA v1/v2, behavior policies, Fortio para load testing
+
+#### Bloco C - Probes e Self Healing
+
+Monitoramento de saúde com Startup, Readiness e Liveness Probes. Configuração de probes HTTP, TCP e Exec para detecção automática de falhas e auto-recuperação de containers.
+
+- **Projeto:** [`n1/m2/b-c/`](./n1/m2/b-c/)
+- **Conteúdo:** Startup/Readiness/Liveness Probes, HTTP/Exec probes, self-healing

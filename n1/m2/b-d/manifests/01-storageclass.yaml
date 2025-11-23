@@ -1,0 +1,83 @@
+# =============================================================================
+# StorageClass - Define como volumes são provisionados
+# =============================================================================
+# O StorageClass é o "blueprint" para criação de volumes no Kubernetes.
+# Ele define:
+# - Qual provisioner criar os volumes (AWS EBS, GCE PD, local, etc.)
+# - Política de recuperação (o que acontece quando PVC é deletado)
+# - Modo de binding (quando vincular PV ao PVC)
+#
+# Para Kind/desenvolvimento local, usamos provisioner manual (no-provisioner)
+# que requer criação manual de PVs.
+# =============================================================================
+
+# Versão da API para StorageClass
+apiVersion: storage.k8s.io/v1
+
+# Tipo do recurso
+kind: StorageClass
+
+# Metadados
+metadata:
+  # Nome do StorageClass - referenciado pelo PV e PVC
+  name: local-storage
+
+  # Labels para organização
+  labels:
+    app.kubernetes.io/name: local-storage
+    app.kubernetes.io/component: storage
+
+# =============================================================================
+# Provisioner - Quem cria os volumes
+# =============================================================================
+# kubernetes.io/no-provisioner = provisonamento manual
+# - Você deve criar PVs manualmente
+# - Ideal para desenvolvimento local com Kind/Minikube
+#
+# Outros provisioners:
+# - kubernetes.io/aws-ebs (AWS)
+# - kubernetes.io/gce-pd (GCP)
+# - kubernetes.io/azure-disk (Azure)
+# - rancher.io/local-path (Rancher)
+# =============================================================================
+provisioner: kubernetes.io/no-provisioner
+
+# =============================================================================
+# Reclaim Policy - O que acontece quando PVC é deletado
+# =============================================================================
+# Retain: PV é MANTIDO após delete do PVC
+#   - Dados ficam preservados
+#   - PV fica em status "Released"
+#   - Requer intervenção manual para reutilizar
+#   - USE PARA: dados críticos, produção
+#
+# Delete: PV é DELETADO junto com PVC
+#   - Dados são PERDIDOS
+#   - Volume é removido do backend (cloud)
+#   - USE PARA: dados temporários, ambientes efêmeros
+# =============================================================================
+reclaimPolicy: Retain
+
+# =============================================================================
+# Volume Binding Mode - Quando vincular PV ao PVC
+# =============================================================================
+# WaitForFirstConsumer: Aguarda um Pod usar o PVC antes de vincular
+#   - Permite scheduling inteligente (Pod no mesmo node do volume)
+#   - RECOMENDADO para volumes locais (hostPath)
+#
+# Immediate: Vincula assim que PVC é criado
+#   - PV é reservado imediatamente
+#   - Pode causar problemas se Pod for schedulado em node diferente
+# =============================================================================
+volumeBindingMode: WaitForFirstConsumer
+
+# =============================================================================
+# Allow Volume Expansion - Permite aumentar tamanho do volume
+# =============================================================================
+# true: PVC pode solicitar mais espaço depois de criado
+# false: Tamanho é fixo após criação
+#
+# NOTA: Nem todos os provisioners suportam expansão
+# Para no-provisioner, expansão deve ser feita manualmente
+# =============================================================================
+allowVolumeExpansion: false

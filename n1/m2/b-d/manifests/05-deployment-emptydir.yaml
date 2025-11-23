@@ -1,0 +1,126 @@
+# =============================================================================
+# Deployment com Volume Efêmero (emptyDir)
+# =============================================================================
+# O emptyDir é um volume TEMPORÁRIO que:
+# - É criado quando o Pod é assignado a um node
+# - Começa vazio (empty directory)
+# - Persiste enquanto o Pod estiver rodando
+# - É DELETADO quando o Pod é removido do node
+#
+# Use para:
+# - Cache de dados temporários
+# - Arquivos temporários de processamento
+# - Compartilhar dados entre containers do mesmo Pod
+# - Scratch space para operações
+#
+# NÃO use para:
+# - Dados que precisam persistir entre restarts
+# - Uploads de usuários
+# - Bancos de dados
+# =============================================================================
+
+# Versão da API
+apiVersion: apps/v1
+
+# Tipo do recurso
+kind: Deployment
+
+# Metadados
+metadata:
+  name: demo-api-emptydir
+  namespace: demo
+  labels:
+    app.kubernetes.io/name: demo-api-emptydir
+    app.kubernetes.io/component: api
+
+# Especificação do Deployment
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demo-api-emptydir
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demo-api-emptydir
+
+    spec:
+      # ========================================================================
+      # Volumes - emptyDir (efêmero)
+      # ========================================================================
+      volumes:
+        - name: temp-storage
+          # =================================================================
+          # emptyDir - Volume temporário
+          # =================================================================
+          # Opções:
+          # - medium: "" (padrão) = usa disco do node
+          # - medium: "Memory" = usa RAM (tmpfs) - mais rápido, mas limitado
+          #
+          # sizeLimit: Define tamanho máximo (requer Kubernetes 1.20+)
+          # Se não definido: usa todo o espaço disponível do medium
+          # =================================================================
+          emptyDir:
+            # Medium vazio = usa disco do node
+            # medium: "Memory"  # Descomente para usar RAM
+            # Limite de tamanho (opcional)
+            sizeLimit: 500Mi
+
+      containers:
+        - name: demo-api
+          image: demo-api:v1
+          imagePullPolicy: Never
+
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          envFrom:
+            - configMapRef:
+                name: demo-api-config
+            - secretRef:
+                name: demo-api-secret
+
+          # ================================================================
+          # Volume Mounts
+          # ================================================================
+          volumeMounts:
+            - name: temp-storage
+              # Mesmo path do deployment com PVC para comparação
+              mountPath: /app/uploads
+
+          # Probes
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            failureThreshold: 10
+            periodSeconds: 5
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always

@@ -1,0 +1,129 @@
+# =============================================================================
+# Deployment com Volume Persistente (PVC)
+# =============================================================================
+# Este Deployment demonstra o uso de PersistentVolumeClaim para:
+# - Armazenar dados que persistem entre restarts de pods
+# - Compartilhar dados entre containers do mesmo pod
+# - Manter uploads, logs, ou qualquer dado persistente
+#
+# A demo-api possui o endpoint /files para testar:
+# - POST /files: Criar arquivo
+# - GET /files: Listar arquivos
+# - GET /files/:name: Ler arquivo
+# - DELETE /files/:name: Deletar arquivo
+# =============================================================================
+
+# Versão da API
+apiVersion: apps/v1
+
+# Tipo do recurso
+kind: Deployment
+
+# Metadados
+metadata:
+  name: demo-api-volume
+  namespace: demo
+  labels:
+    app.kubernetes.io/name: demo-api-volume
+    app.kubernetes.io/component: api
+
+# Especificação do Deployment
+spec:
+  # Uma réplica para demonstração
+  # Com RWO, múltiplas réplicas funcionam apenas no mesmo node
+  replicas: 1
+
+  # Seletor de pods
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demo-api-volume
+
+  # Template do Pod
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demo-api-volume
+
+    spec:
+      # ========================================================================
+      # Volumes - Define os volumes disponíveis para o Pod
+      # ========================================================================
+      # Volumes são definidos aqui e montados nos containers via volumeMounts
+      # ========================================================================
+      volumes:
+        # Nome do volume (referenciado em volumeMounts)
+        - name: uploads-storage
+          # =================================================================
+          # PersistentVolumeClaim - Usa o PVC criado anteriormente
+          # =================================================================
+          # O volume é vinculado ao PVC, que está vinculado ao PV
+          # Dados persistem mesmo se o Pod for deletado e recriado
+          # =================================================================
+          persistentVolumeClaim:
+            # Nome do PVC (deve existir no mesmo namespace)
+            claimName: demo-api-pvc
+
+      containers:
+        - name: demo-api
+          image: demo-api:v1
+          imagePullPolicy: Never
+
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          # Variáveis de ambiente
+          envFrom:
+            - configMapRef:
+                name: demo-api-config
+            - secretRef:
+                name: demo-api-secret
+
+          # ================================================================
+          # Volume Mounts - Monta volumes no filesystem do container
+          # ================================================================
+          volumeMounts:
+            # Nome do volume (deve corresponder ao definido em volumes)
+            - name: uploads-storage
+              # Caminho onde o volume será montado dentro do container
+              # A demo-api usa /app/uploads para armazenar arquivos
+              mountPath: /app/uploads
+              # readOnly: false (padrão) - permite leitura e escrita
+              # readOnly: true - apenas leitura
+
+          # Probes
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            failureThreshold: 10
+            periodSeconds: 5
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          # Recursos
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+      # Tempo para graceful shutdown
+      terminationGracePeriodSeconds: 30
+
+      restartPolicy: Always

@@ -1,0 +1,79 @@
+# =============================================================================
+# PersistentVolumeClaim (PVC) - Requisição de armazenamento
+# =============================================================================
+# O PVC é como a aplicação SOLICITA armazenamento.
+# É um recurso de NAMESPACE (pertence a um namespace específico).
+#
+# O PVC não se conecta diretamente ao storage - ele faz um "pedido"
+# que o Kubernetes resolve encontrando um PV compatível.
+#
+# Binding (vinculação):
+# 1. PVC é criado com requisitos (tamanho, access mode, storage class)
+# 2. Kubernetes procura um PV compatível
+# 3. Se encontrar: PVC fica "Bound" ao PV
+# 4. Se não encontrar: PVC fica "Pending" até um PV ficar disponível
+# =============================================================================
+
+# Versão da API
+apiVersion: v1
+
+# Tipo do recurso
+kind: PersistentVolumeClaim
+
+# Metadados
+metadata:
+  # Nome do PVC - referenciado pelo Deployment
+  name: demo-api-pvc
+
+  # Namespace - PVC pertence a um namespace
+  namespace: demo
+
+  # Labels
+  labels:
+    app.kubernetes.io/name: demo-api
+    app.kubernetes.io/component: storage
+
+# Especificação do PVC
+spec:
+  # ==========================================================================
+  # StorageClassName - Qual StorageClass usar
+  # ==========================================================================
+  # Deve corresponder ao storageClassName do PV desejado
+  # Se omitido: usa o StorageClass default do cluster
+  # Se "": não usa StorageClass (binding estático por labels)
+  # ==========================================================================
+  storageClassName: local-storage
+
+  # ==========================================================================
+  # Access Modes - Modos de acesso necessários
+  # ==========================================================================
+  # PVC só vincula a PVs que suportam TODOS os modos solicitados
+  # Deve ser compatível com o PV alvo
+  # ==========================================================================
+  accessModes:
+    - ReadWriteOnce
+
+  # ==========================================================================
+  # Resources - Quanto espaço requisitar
+  # ==========================================================================
+  # requests.storage: Mínimo necessário
+  # PVC vincula a PVs com capacidade >= requests
+  #
+  # Neste caso: requisita 5Gi, PV tem 10Gi
+  # O PVC será vinculado ao PV de 10Gi
+  # ==========================================================================
+  resources:
+    requests:
+      # Solicitando 5 Gibibytes
+      # Pode ser menor ou igual à capacidade do PV
+      storage: 5Gi
+
+  # ==========================================================================
+  # Selector - Seleção específica de PV (opcional)
+  # ==========================================================================
+  # Permite selecionar PV específico por labels
+  # Útil quando há múltiplos PVs e você quer um específico
+  # ==========================================================================
+  # selector:
+  #   matchLabels:
+  #     type: local

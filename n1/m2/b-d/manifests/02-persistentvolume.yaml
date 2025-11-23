@@ -1,0 +1,117 @@
+# =============================================================================
+# PersistentVolume (PV) - Reserva de espaço no cluster
+# =============================================================================
+# O PersistentVolume representa um pedaço de armazenamento no cluster.
+# É um recurso do CLUSTER (não pertence a um namespace).
+#
+# Provisionamento:
+# - Estático: Admin cria PVs manualmente (este exemplo)
+# - Dinâmico: StorageClass cria PVs automaticamente quando PVC é criado
+#
+# Para Kind, usamos hostPath que mapeia um diretório do node.
+# IMPORTANTE: hostPath só funciona em single-node ou se Pod for schedulado
+# no mesmo node onde está o diretório.
+# =============================================================================
+
+# Versão da API
+apiVersion: v1
+
+# Tipo do recurso
+kind: PersistentVolume
+
+# Metadados
+metadata:
+  # Nome único do PV no cluster
+  name: demo-api-pv
+
+  # Labels para seleção e organização
+  labels:
+    app.kubernetes.io/name: demo-api
+    app.kubernetes.io/component: storage
+    # Label customizado para identificar tipo de storage
+    type: local
+
+# Especificação do PV
+spec:
+  # ==========================================================================
+  # StorageClassName - Vincula ao StorageClass
+  # ==========================================================================
+  # Deve corresponder ao nome do StorageClass criado
+  # PVCs com mesmo storageClassName podem usar este PV
+  # ==========================================================================
+  storageClassName: local-storage
+
+  # ==========================================================================
+  # Capacity - Capacidade total do volume
+  # ==========================================================================
+  # Define quanto espaço este PV oferece
+  # PVCs podem requisitar ATÉ este valor
+  # ==========================================================================
+  capacity:
+    # 10 Gibibytes de armazenamento
+    storage: 10Gi
+
+  # ==========================================================================
+  # Access Modes - Modos de acesso permitidos
+  # ==========================================================================
+  # ReadWriteOnce (RWO): Leitura/escrita por UM node
+  #   - Mais comum para volumes locais e cloud
+  #   - Múltiplos pods NO MESMO NODE podem acessar
+  #
+  # ReadOnlyMany (ROX): Apenas leitura por MÚLTIPLOS nodes
+  #   - Para dados compartilhados read-only
+  #
+  # ReadWriteMany (RWX): Leitura/escrita por MÚLTIPLOS nodes
+  #   - Requer NFS, CephFS, ou similar
+  #   - hostPath NÃO suporta RWX
+  # ==========================================================================
+  accessModes:
+    - ReadWriteOnce
+
+  # ==========================================================================
+  # Persistent Volume Reclaim Policy
+  # ==========================================================================
+  # Sobrescreve a política do StorageClass se especificado
+  # Retain = mantém dados após PVC ser deletado
+  # ==========================================================================
+  persistentVolumeReclaimPolicy: Retain
+
+  # ==========================================================================
+  # hostPath - Diretório no node do cluster
+  # ==========================================================================
+  # Mapeia um diretório do sistema de arquivos do node
+  #
+  # ATENÇÃO:
+  # - Funciona apenas em single-node clusters (Kind, Minikube)
+  # - Em multi-node, Pod deve ser schedulado no node correto
+  # - NÃO use em produção (dados não são replicados)
+  #
+  # Para Kind, o diretório fica DENTRO do container Docker do node
+  # Crie com: docker exec -it k8s-lab-worker mkdir -p /mnt/data
+  # ==========================================================================
+  hostPath:
+    # Caminho no node (não no seu computador!)
+    path: "/mnt/data"
+    # Tipo de hostPath:
+    # DirectoryOrCreate: Cria o diretório se não existir
+    # Directory: Diretório deve existir
+    # File: Arquivo deve existir
+    # FileOrCreate: Cria o arquivo se não existir
+    type: DirectoryOrCreate
+
+  # ==========================================================================
+  # Node Affinity - Em qual node o volume está
+  # ==========================================================================
+  # Para volumes locais, especifica em qual node está o diretório
+  # O scheduler garante que Pods usando este PV rodem neste node
+  # ==========================================================================
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            # Seleciona nodes com este hostname
+            # Para Kind: k8s-lab-worker (nome do container Docker)
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - k8s-lab-worker

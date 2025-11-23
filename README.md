@@ -46,3 +46,10 @@ Monitoramento de saúde com Startup, Readiness e Liveness Probes. Configuração
 
 - **Projeto:** [`n1/m2/b-c/`](./n1/m2/b-c/)
 - **Conteúdo:** Startup/Readiness/Liveness Probes, HTTP/Exec probes, self-healing
+
+#### Bloco D - Entendendo mais sobre Volumes
+
+Armazenamento persistente com StorageClass, PersistentVolume e PersistentVolumeClaim. Diferença entre volumes efêmeros (emptyDir) e persistentes, modos de acesso (RWO, ROX, RWX) e políticas de recuperação (Retain, Delete).
+
+- **Projeto:** [`n1/m2/b-d/`](./n1/m2/b-d/)
+- **Conteúdo:** StorageClass, PV, PVC, hostPath, emptyDir, volume mounts

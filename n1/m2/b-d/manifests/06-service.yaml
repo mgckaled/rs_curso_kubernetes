@@ -1,0 +1,36 @@
+# =============================================================================
+# Service para Deployment com Volume
+# =============================================================================
+# Service para expor o deployment com volume persistente.
+# Usado para testar a persistência de dados via endpoints /files.
+# =============================================================================
+
+# Versão da API
+apiVersion: v1
+
+# Tipo do recurso
+kind: Service
+
+# Metadados
+metadata:
+  name: demo-api-volume-service
+  namespace: demo
+  labels:
+    app.kubernetes.io/name: demo-api-volume
+    app.kubernetes.io/component: service
+
+# Especificação do Service
+spec:
+  # Tipo ClusterIP - acesso interno
+  type: ClusterIP
+
+  # Seletor - roteia para deployment com volume
+  selector:
+    app.kubernetes.io/name: demo-api-volume
+
+  # Portas
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

@@ -1,0 +1,117 @@
+# =============================================================================
+# HPA v2 com Behavior - Controle fino de velocidade de escala
+# =============================================================================
+# O campo 'behavior' permite controlar:
+# - Velocidade do scale up (quantos pods criar e em quanto tempo)
+# - Velocidade do scale down (quantos pods remover e em quanto tempo)
+# - Janela de estabilização (evita flapping)
+#
+# Útil para:
+# - Evitar scale down muito rápido após picos curtos
+# - Controlar velocidade de scale up para não sobrecarregar dependências
+# - Estabilizar aplicações com carga variável
+# =============================================================================
+
+# Versão da API
+apiVersion: autoscaling/v2
+
+# Tipo do recurso
+kind: HorizontalPodAutoscaler
+
+# Metadados
+metadata:
+  name: demo-api-hpa-behavior
+  namespace: demo
+  labels:
+    app.kubernetes.io/name: demo-api
+    app.kubernetes.io/component: hpa
+
+# Especificação do HPA
+spec:
+  # Recurso alvo
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: demo-api
+
+  # Limites de réplicas
+  minReplicas: 1
+  maxReplicas: 10
+
+  # Métricas (CPU e Memory)
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+  # ==========================================================================
+  # behavior - Controle de velocidade de escala
+  # ==========================================================================
+  behavior:
+    # ------------------------------------------------------------------------
+    # scaleUp - Configurações para aumentar réplicas
+    # ------------------------------------------------------------------------
+    scaleUp:
+      # Janela de estabilização (segundos)
+      # HPA aguarda este tempo observando métricas antes de escalar
+      # 0 = escala imediatamente quando métricas excedem target
+      stabilizationWindowSeconds: 0
+
+      # Políticas de scale up (pode ter múltiplas)
+      policies:
+        # Política 1: Adicionar até 4 pods por vez
+        - type: Pods
+          # Máximo de pods a adicionar
+          value: 4
+          # Período em segundos para aplicar esta política
+          periodSeconds: 15
+
+        # Política 2: Dobrar o número de pods (100%)
+        - type: Percent
+          # Porcentagem de aumento
+          value: 100
+          # Período em segundos
+          periodSeconds: 15
+
+      # selectPolicy: qual política usar quando múltiplas se aplicam
+      # Max: usa a que resulta em mais réplicas (padrão)
+      # Min: usa a que resulta em menos réplicas
+      # Disabled: desabilita scale up
+      selectPolicy: Max
+
+    # ------------------------------------------------------------------------
+    # scaleDown - Configurações para reduzir réplicas
+    # ------------------------------------------------------------------------
+    scaleDown:
+      # Janela de estabilização (segundos)
+      # IMPORTANTE: Valor maior evita scale down prematuro
+      # HPA considera o maior número de réplicas necessário
+      # nos últimos N segundos antes de reduzir
+      # 300 = 5 minutos de estabilização
+      stabilizationWindowSeconds: 300
+
+      # Políticas de scale down
+      policies:
+        # Política 1: Remover até 2 pods por vez
+        # Mais conservador para evitar perda de capacidade
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+
+        # Política 2: Reduzir até 10% por vez
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+
+      # Usa a política que resulta em MENOS remoções
+      # Mais conservador no scale down
+      selectPolicy: Min

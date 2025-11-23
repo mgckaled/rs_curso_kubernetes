@@ -1,0 +1,80 @@
+# =============================================================================
+# HPA v2 - Horizontal Pod Autoscaler (versão avançada)
+# =============================================================================
+# A versão v2 do HPA oferece recursos avançados:
+# - Múltiplas métricas (CPU, Memory, Custom)
+# - Diferentes tipos de target (Utilization, Value, AverageValue)
+# - Controle de behavior (velocidade de scale up/down)
+#
+# O HPA escala quando QUALQUER métrica exceder o target.
+# Usa a métrica que resultar no maior número de réplicas.
+# =============================================================================
+
+# Versão da API - autoscaling/v2 é a versão mais recente e completa
+apiVersion: autoscaling/v2
+
+# Tipo do recurso
+kind: HorizontalPodAutoscaler
+
+# Metadados
+metadata:
+  # Nome do HPA
+  name: demo-api-hpa-v2
+  # Namespace
+  namespace: demo
+  # Labels
+  labels:
+    app.kubernetes.io/name: demo-api
+    app.kubernetes.io/component: hpa
+
+# Especificação do HPA
+spec:
+  # ==========================================================================
+  # scaleTargetRef - Recurso alvo do escalonamento
+  # ==========================================================================
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: demo-api
+
+  # ==========================================================================
+  # Limites de réplicas
+  # ==========================================================================
+  # Mínimo de réplicas (garante disponibilidade)
+  minReplicas: 1
+  # Máximo de réplicas (controla custos)
+  maxReplicas: 10
+
+  # ==========================================================================
+  # metrics - Lista de métricas para decisão de escala
+  # ==========================================================================
+  # O HPA avalia TODAS as métricas e usa a que resultar em mais réplicas
+  metrics:
+    # ------------------------------------------------------------------------
+    # Métrica de CPU
+    # ------------------------------------------------------------------------
+    - type: Resource
+      resource:
+        # Nome do recurso (cpu ou memory)
+        name: cpu
+        # Target define o objetivo
+        target:
+          # Utilization: porcentagem do requests
+          # Value: valor absoluto (ex: 500m)
+          # AverageValue: média absoluta por pod
+          type: Utilization
+          # Escala quando média > 50%
+          averageUtilization: 50
+
+    # ------------------------------------------------------------------------
+    # Métrica de Memória
+    # ------------------------------------------------------------------------
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          # Escala quando média de memória > 70%
+          # Memória geralmente tem target mais alto que CPU
+          # pois aplicações tendem a manter uso estável
+          averageUtilization: 70

@@ -1,0 +1,42 @@
+# =============================================================================
+# Service - Expõe a aplicação para testes de carga
+# =============================================================================
+# O Service é essencial para os testes de estresse com Fortio.
+# O Fortio vai acessar a aplicação através do DNS interno:
+# http://demo-api-service.demo.svc.cluster.local ou http://demo-api-service
+# =============================================================================
+
+# Versão da API
+apiVersion: v1
+
+# Tipo do recurso
+kind: Service
+
+# Metadados
+metadata:
+  # Nome do Service - usado como hostname no cluster
+  name: demo-api-service
+  # Namespace
+  namespace: demo
+  # Labels
+  labels:
+    app.kubernetes.io/name: demo-api
+    app.kubernetes.io/component: service
+
+# Especificação do Service
+spec:
+  # Tipo ClusterIP - acesso interno apenas
+  type: ClusterIP
+
+  # Seletor - roteia para pods com este label
+  selector:
+    app.kubernetes.io/name: demo-api
+
+  # Portas
+  ports:
+    - name: http
+      # Porta do Service (clientes conectam aqui)
+      port: 80
+      # Porta do container (tráfego direcionado para cá)
+      targetPort: 3000
+      protocol: TCP

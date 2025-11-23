@@ -1,0 +1,260 @@
+# =============================================================================
+# Metrics Server - Coleta de métricas de recursos em tempo real
+# =============================================================================
+# O Metrics Server é um componente essencial para o funcionamento do HPA.
+# Ele coleta métricas de CPU e memória dos containers via kubelet.
+# Sem o Metrics Server, o HPA não consegue tomar decisões de escala.
+#
+# Esta versão está configurada para Kind (--kubelet-insecure-tls).
+# Para produção, remova essa flag e configure certificados adequados.
+# =============================================================================
+
+# ServiceAccount para o Metrics Server
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  # Nome da conta de serviço
+  name: metrics-server
+  # Namespace de sistema do Kubernetes
+  namespace: kube-system
+  # Labels padrão do Metrics Server
+  labels:
+    k8s-app: metrics-server
+
+---
+
+# ClusterRole - Permissões de leitura de métricas no cluster
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:aggregated-metrics-reader
+  labels:
+    k8s-app: metrics-server
+    # Labels para agregação automática de permissões
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+# Regras de acesso
+rules:
+  # Permite ler métricas de pods e nodes
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list", "watch"]
+
+---
+
+# ClusterRole - Permissões do Metrics Server
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:metrics-server
+  labels:
+    k8s-app: metrics-server
+rules:
+  # Acesso a métricas dos nodes
+  - apiGroups: [""]
+    resources: ["nodes/metrics"]
+    verbs: ["get"]
+  # Acesso a pods e nodes
+  - apiGroups: [""]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list", "watch"]
+
+---
+
+# RoleBinding - Vincula ServiceAccount ao ClusterRole de autenticação
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: metrics-server-auth-reader
+  namespace: kube-system
+  labels:
+    k8s-app: metrics-server
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+  - kind: ServiceAccount
+    name: metrics-server
+    namespace: kube-system
+
+---
+
+# ClusterRoleBinding - Vincula ServiceAccount ao ClusterRole de métricas
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:metrics-server
+  labels:
+    k8s-app: metrics-server
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:metrics-server
+subjects:
+  - kind: ServiceAccount
+    name: metrics-server
+    namespace: kube-system
+
+---
+
+# ClusterRoleBinding - Delegação de autenticação
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metrics-server:system:auth-delegator
+  labels:
+    k8s-app: metrics-server
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: metrics-server
+    namespace: kube-system
+
+---
+
+# Service - Expõe o Metrics Server internamente
+apiVersion: v1
+kind: Service
+metadata:
+  name: metrics-server
+  namespace: kube-system
+  labels:
+    k8s-app: metrics-server
+spec:
+  # Portas do serviço
+  ports:
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: https
+  # Seletor para os pods do Metrics Server
+  selector:
+    k8s-app: metrics-server
+
+---
+
+# Deployment - Metrics Server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-server
+  namespace: kube-system
+  labels:
+    k8s-app: metrics-server
+spec:
+  # Uma réplica é suficiente para clusters pequenos
+  replicas: 1
+  # Seletor de pods
+  selector:
+    matchLabels:
+      k8s-app: metrics-server
+  # Estratégia de atualização
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+  # Template do pod
+  template:
+    metadata:
+      labels:
+        k8s-app: metrics-server
+    spec:
+      # ServiceAccount com permissões
+      serviceAccountName: metrics-server
+      # Container do Metrics Server
+      containers:
+        - name: metrics-server
+          # Imagem oficial do Metrics Server
+          image: registry.k8s.io/metrics-server/metrics-server:v0.7.2
+          # Argumentos de inicialização
+          args:
+            # Certificado para comunicação segura
+            - --cert-dir=/tmp
+            # Porta HTTPS
+            - --secure-port=10250
+            # IMPORTANTE: Desabilita verificação de certificado do kubelet
+            # Necessário para Kind/Minikube. Remova em produção!
+            - --kubelet-insecure-tls
+            # Usa endereço interno do node
+            - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+            # Intervalo de coleta de métricas
+            - --metric-resolution=15s
+          # Portas expostas
+          ports:
+            - name: https
+              containerPort: 10250
+              protocol: TCP
+          # Probes de saúde
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: https
+              scheme: HTTPS
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: https
+              scheme: HTTPS
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 3
+          # Recursos do container
+          resources:
+            requests:
+              cpu: 100m
+              memory: 200Mi
+            limits:
+              cpu: 200m
+              memory: 400Mi
+          # Contexto de segurança
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ["ALL"]
+          # Volumes montados
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
+      # Volumes
+      volumes:
+        - name: tmp-dir
+          emptyDir: {}
+      # Prioridade do pod
+      priorityClassName: system-cluster-critical
+      # Tolerations para rodar em nodes de sistema
+      nodeSelector:
+        kubernetes.io/os: linux
+
+---
+
+# APIService - Registra o Metrics Server como API aggregation
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1beta1.metrics.k8s.io
+  labels:
+    k8s-app: metrics-server
+spec:
+  # Serviço que atende esta API
+  service:
+    name: metrics-server
+    namespace: kube-system
+  # Grupo e versão da API
+  group: metrics.k8s.io
+  version: v1beta1
+  # Indica que o serviço não é seguro (Kind)
+  insecureSkipTLSVerify: true
+  # Prioridade do grupo
+  groupPriorityMinimum: 100
+  versionPriority: 100

@@ -32,3 +32,10 @@ Deploy de aplicação NestJS com estratégias de atualização (RollingUpdate e 
 
 - **Projeto:** [`n1/m2/b-a/`](./n1/m2/b-a/)
 - **Conteúdo:** Namespace, ConfigMap, Secret, Deployment (RollingUpdate/Recreate), Service ClusterIP
+
+#### Bloco B - Conhecendo o HPA
+
+Escalonamento automático com Horizontal Pod Autoscaler: instalação do Metrics Server, configuração de HPA v1 (CPU) e v2 (CPU + Memory), políticas de behavior para controle de velocidade de scale up/down, e testes de estresse com Fortio.
+
+- **Projeto:** [`n1/m2/b-b/`](./n1/m2/b-b/)
+- **Conteúdo:** Metrics Server, HPA v1/v2, behavior policies, Fortio para load testing

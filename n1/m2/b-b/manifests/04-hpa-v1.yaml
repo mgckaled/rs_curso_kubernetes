@@ -1,0 +1,70 @@
+# =============================================================================
+# HPA v1 - Horizontal Pod Autoscaler (versão simplificada)
+# =============================================================================
+# A versão v1 do HPA é mais simples e suporta apenas CPU como métrica.
+# Use quando:
+# - Você precisa de autoescala básica baseada em CPU
+# - Quer simplicidade na configuração
+# - Não precisa de métricas de memória ou customizadas
+#
+# Limitações da v1:
+# - Apenas uma métrica (CPU)
+# - Sem controle de behavior (velocidade de scale up/down)
+# - Sem métricas customizadas
+# =============================================================================
+
+# Versão da API - autoscaling/v1 é a versão estável mais antiga
+apiVersion: autoscaling/v1
+
+# Tipo do recurso
+kind: HorizontalPodAutoscaler
+
+# Metadados
+metadata:
+  # Nome do HPA
+  name: demo-api-hpa-v1
+  # Namespace (mesmo do Deployment)
+  namespace: demo
+  # Labels
+  labels:
+    app.kubernetes.io/name: demo-api
+    app.kubernetes.io/component: hpa
+
+# Especificação do HPA
+spec:
+  # ==========================================================================
+  # scaleTargetRef - Referência ao recurso que será escalado
+  # ==========================================================================
+  scaleTargetRef:
+    # Tipo do recurso alvo
+    apiVersion: apps/v1
+    kind: Deployment
+    # Nome do Deployment (deve existir no mesmo namespace)
+    name: demo-api
+
+  # ==========================================================================
+  # Limites de réplicas
+  # ==========================================================================
+  # Mínimo de réplicas - nunca terá menos que isso
+  # Garante disponibilidade mínima mesmo sem carga
+  minReplicas: 1
+
+  # Máximo de réplicas - nunca terá mais que isso
+  # Protege contra escala infinita e custos excessivos
+  maxReplicas: 10
+
+  # ==========================================================================
+  # targetCPUUtilizationPercentage - Trigger de CPU
+  # ==========================================================================
+  # Porcentagem alvo de utilização de CPU
+  # HPA escala para manter a média próxima deste valor
+  #
+  # Cálculo: (uso atual / requests.cpu) * 100
+  #
+  # Se a média de todos os pods > 50%: scale UP
+  # Se a média de todos os pods < 50%: scale DOWN
+  #
+  # Valor 50 é um bom ponto de partida:
+  # - Deixa margem para picos (50% livre)
+  # - Escala antes de saturar
+  targetCPUUtilizationPercentage: 50

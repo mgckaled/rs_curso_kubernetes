@@ -1,0 +1,65 @@
+# =============================================================================
+# Fortio - Ferramenta de teste de carga
+# =============================================================================
+# Fortio é uma ferramenta de teste de carga desenvolvida pelo time do Istio.
+# Permite gerar tráfego HTTP para testar performance e escala.
+#
+# Parâmetros principais:
+# -c N    : número de conexões/threads simultâneas
+# -t Ns   : duração do teste em segundos
+# -qps N  : queries por segundo (0 = máximo possível)
+# -n N    : número total de requisições
+#
+# Exemplos de uso:
+# fortio load -c 8 -t 30s -qps 0 http://service/endpoint
+# fortio load -c 4 -n 1000 http://service/endpoint
+# =============================================================================
+
+# Versão da API
+apiVersion: v1
+
+# Tipo do recurso - Pod standalone para testes
+kind: Pod
+
+# Metadados
+metadata:
+  # Nome do pod
+  name: fortio
+  # Namespace (mesmo da aplicação para acesso via Service)
+  namespace: demo
+  # Labels
+  labels:
+    app.kubernetes.io/name: fortio
+    app.kubernetes.io/component: testing
+
+# Especificação do Pod
+spec:
+  containers:
+    - name: fortio
+      # Imagem oficial do Fortio
+      image: fortio/fortio:latest
+      # Always para garantir versão mais recente
+      imagePullPolicy: Always
+
+      # Comando para manter o pod rodando
+      # O Fortio será executado via kubectl exec
+      command:
+        - /bin/sh
+        - -c
+        # Sleep infinito - pod fica aguardando comandos
+        - "sleep infinity"
+
+      # Recursos do container
+      resources:
+        requests:
+          # CPU para gerar carga
+          cpu: "100m"
+          memory: "128Mi"
+        limits:
+          # Limite maior para não throttle durante testes
+          cpu: "500m"
+          memory: "256Mi"
+
+  # Política de restart
+  # Never = se o pod morrer, não reinicia
+  restartPolicy: Never

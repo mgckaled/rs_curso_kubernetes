@@ -1,0 +1,110 @@
+# =============================================================================
+# Deployment - Configurado para HPA (Horizontal Pod Autoscaler)
+# =============================================================================
+# Este Deployment está otimizado para funcionar com HPA:
+# - resources.requests OBRIGATÓRIO (HPA calcula % baseado nisso)
+# - resources.limits definidos para evitar consumo excessivo
+# - Número inicial de réplicas baixo (HPA vai ajustar)
+# =============================================================================
+
+# Versão da API para Deployments
+apiVersion: apps/v1
+
+# Tipo do recurso
+kind: Deployment
+
+# Metadados do Deployment
+metadata:
+  # Nome do Deployment
+  name: demo-api
+  # Namespace (deve existir)
+  namespace: demo
+  # Labels identificadores
+  labels:
+    app.kubernetes.io/name: demo-api
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: api
+
+# Especificação do Deployment
+spec:
+  # ==========================================================================
+  # IMPORTANTE: Número inicial de réplicas
+  # O HPA vai sobrescrever este valor baseado na carga
+  # Comece com um valor baixo para ver o HPA em ação
+  # ==========================================================================
+  replicas: 1
+
+  # Seletor de pods
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demo-api
+
+  # Estratégia de atualização
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+  # Template do Pod
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demo-api
+        app.kubernetes.io/version: "1.0.0"
+    spec:
+      containers:
+        - name: demo-api
+          # Imagem da aplicação
+          image: demo-api:v1
+          # Never para Kind (imagem local)
+          imagePullPolicy: Never
+
+          # Portas do container
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          # Variáveis de ambiente do ConfigMap e Secret
+          envFrom:
+            - configMapRef:
+                name: demo-api-config
+            - secretRef:
+                name: demo-api-secret
+
+          # =================================================================
+          # RECURSOS - CRÍTICO PARA O HPA
+          # =================================================================
+          # O HPA calcula a porcentagem de utilização assim:
+          # % utilização = (uso atual / requests) * 100
+          #
+          # Exemplo: Se requests.cpu = 100m e o pod usa 80m:
+          # % utilização = (80 / 100) * 100 = 80%
+          #
+          # Se o target do HPA é 50%, ele vai escalar pois 80% > 50%
+          # =================================================================
+          resources:
+            # Requests: recursos GARANTIDOS ao container
+            # OBRIGATÓRIO para o HPA funcionar!
+            requests:
+              # 100 milicores de CPU (0.1 CPU)
+              # Valor baixo para facilitar trigger do HPA em testes
+              cpu: "100m"
+              # 128 MiB de memória
+              memory: "128Mi"
+
+            # Limits: máximo que o container pode usar
+            # CPU: throttling se exceder
+            # Memory: OOMKilled se exceder
+            limits:
+              # 500 milicores (0.5 CPU)
+              cpu: "500m"
+              # 512 MiB de memória
+              memory: "512Mi"
+
+      # Tempo para graceful shutdown
+      terminationGracePeriodSeconds: 30
+
+      # Política de restart
+      restartPolicy: Always

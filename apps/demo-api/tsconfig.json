@@ -1,0 +1,36 @@
+{
+  "$schema": "https://www.schemastore.org/tsconfig",
+  "display": "Node 22 + NestJS",
+  "_version": "22.0.0",
+
+  "compilerOptions": {
+    "lib": ["es2024", "ESNext.Array", "ESNext.Collection", "ESNext.Iterator"],
+    "module": "nodenext",
+    "target": "es2022",
+    "moduleResolution": "nodenext",
+
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+
+    "ignoreDeprecations": "5.0",
+
+    "declaration": true,
+    "removeComments": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

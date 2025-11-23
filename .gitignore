@@ -1,2 +1,40 @@
-# personal notes
+# Personal notes
 notes.md
+
+# Dependencies
+node_modules
+pnpm-lock.yaml
+
+# Build
+dist
+build
+*.tsbuildinfo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs
+
+# Test
+coverage
+
+# Docker
+*.tar
+
+# Kubernetes secrets (nunca commitar!)
+*-secret.yaml
+*.secret.yaml

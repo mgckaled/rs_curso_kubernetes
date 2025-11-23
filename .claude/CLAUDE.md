@@ -4,12 +4,11 @@
 
 - SystemInfo:
   - WindowsVersion: 2009
+  - Windows 10 Home Single Language v22H2 (compilação 19045.6575)
   - OsArchitecture: 64 bits
   - CsProcessors: {Intel(R) Core(TM) i5-8265U CPU @1.60GHz}
   - CsTotalPhysicalMemory : 16977367040
 
-- Windows 10 Home Single Language v22H2 (compilação 19045.6575)
-  
 - WSL:
   - Versão do WSL: 2.6.1.0
   - Versão do kernel: 6.6.87.2-1
@@ -51,4 +50,4 @@
 
 - Obedeça a formatação/lint na geração de arquivos markdown (`.md`)
 - commits detalhados, porém não muito extenso
-- não faça nenhum tipo de referências ao Claude Code nos texto de commit
+- não faça nenhum tipo de referências ao Claude Code nos texto de commit. sempre remover. ex: 🤖 Generated with [ClaudeCode](https://claude.com/claude-code) Co-Authored-By: Claude <noreply@anthropic.com>".

@@ -1,0 +1,35 @@
+# Deployment: abstração sobre ReplicaSet
+# Vantagens: rolling updates, rollback, histórico de versões
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  namespace: lab
+  labels:
+    app: nginx
+spec:
+  # replicas: quantidade de pods
+  replicas: 3
+  # selector: identifica pods gerenciados
+  selector:
+    matchLabels:
+      app: nginx
+  # template: modelo do pod (igual ao ReplicaSet)
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          # tag: associe ao commit/versão da aplicação
+          image: nginx:1.27.5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+          ports:
+            - containerPort: 80

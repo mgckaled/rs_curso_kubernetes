@@ -2,6 +2,12 @@
 
 ## Configurações Atuais
 
+- SystemInfo:
+  - WindowsVersion: 2009
+  - OsArchitecture: 64 bits
+  - CsProcessors: {Intel(R) Core(TM) i5-8265U CPU @1.60GHz}
+  - CsTotalPhysicalMemory : 16977367040
+
 - Windows 10 Home Single Language v22H2 (compilação 19045.6575)
   
 - WSL:
@@ -40,3 +46,9 @@
 - Sequenciar e fornecer passo a passo (caso necessário, crie um arquivo .md para facilitar e registrar).
 - Explicar cada comando de terminal necessário para implementação dos projetos didáticos.
 - Explicação breve e linha por linha dos arquivos `.yaml` através de comentários.
+
+## Recomendações Gerais
+
+- Obedeça a formatação/lint na geração de arquivos markdown (`.md`)
+- commits detalhados, porém não muito extenso
+- não faça nenhum tipo de referências ao Claude Code nos texto de commit

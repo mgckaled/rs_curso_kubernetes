@@ -1,0 +1,37 @@
+# ReplicaSet: garante número desejado de réplicas
+# Problema: não suporta atualizações de versão graciosamente
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: nginx-replicaset
+  namespace: lab
+  # labels: identificam o próprio ReplicaSet
+  labels:
+    app: nginx
+spec:
+  # replicas: quantidade de pods desejada
+  replicas: 3
+  # selector: como o ReplicaSet encontra os pods que gerencia
+  selector:
+    # matchLabels: pods DEVEM ter estas labels
+    matchLabels:
+      app: nginx
+  # template: modelo para criar novos pods
+  template:
+    metadata:
+      # labels: DEVEM corresponder ao selector
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27.5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+          ports:
+            - containerPort: 80

@@ -1,0 +1,37 @@
+# Pod: menor unidade do Kubernetes
+# Encapsula um ou mais containers
+apiVersion: v1
+kind: Pod
+metadata:
+  # name: identificador único do pod no namespace
+  name: nginx-pod
+  # namespace: onde o pod será criado
+  namespace: lab
+  # labels: metadados para seleção e organização
+  labels:
+    app: nginx
+spec:
+  # containers: lista de containers no pod
+  containers:
+    # name: identificador do container dentro do pod
+    - name: nginx
+      # image: imagem do container (registry/nome:tag)
+      image: nginx:1.27.5
+      # resources: define limites e requisições de recursos
+      resources:
+        # requests: recursos mínimos garantidos
+        # Usado pelo scheduler para alocar o pod
+        requests:
+          # cpu: 100m = 0.1 vCPU (milicores)
+          cpu: "100m"
+          # memory: 128Mi = 128 Mebibytes
+          memory: "128Mi"
+        # limits: recursos máximos permitidos
+        # Container é terminado se exceder memory limit
+        limits:
+          cpu: "250m"
+          memory: "256Mi"
+      # ports: portas expostas pelo container
+      ports:
+        # containerPort: porta interna do container
+        - containerPort: 80

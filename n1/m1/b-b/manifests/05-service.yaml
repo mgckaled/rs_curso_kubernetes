@@ -1,0 +1,22 @@
+# Service: abstração de rede para acessar pods
+# Tipos: ClusterIP (interno), NodePort, LoadBalancer
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+  namespace: lab
+spec:
+  # selector: pods que receberão tráfego
+  # DEVE corresponder às labels dos pods do Deployment
+  selector:
+    app: nginx
+  # type: ClusterIP é o padrão (acesso interno)
+  type: ClusterIP
+  # ports: mapeamento de portas
+  ports:
+    # protocol: TCP ou UDP
+    - protocol: TCP
+      # port: porta exposta pelo Service
+      port: 80
+      # targetPort: porta do container
+      targetPort: 80

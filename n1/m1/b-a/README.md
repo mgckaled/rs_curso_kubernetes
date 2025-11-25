@@ -9,15 +9,25 @@
 
 ---
 
+## Documentação Complementar
+
+Este bloco contém documentos de referência na pasta `docs/`:
+
+- **[LIMPEZA-CLUSTER.md](docs/LIMPEZA-CLUSTER.md)**: Guia completo para deletar clusters Kind e limpar configurações do kubeconfig. Inclui diferentes abordagens (Lens, kubectl, kind) e quando usar cada uma.
+
+- **[PODS-KUBE-SYSTEM.md](docs/PODS-KUBE-SYSTEM.md)**: Explicação detalhada dos pods do namespace kube-system, função de cada componente (etcd, apiserver, scheduler, controller-manager, CoreDNS, kube-proxy, CNI) e como interpretá-los.
+
+---
+
 ## Arquitetura do Cluster
 
 ```txt
 ┌─────────────────────────────────────────────────────────────┐
 │                      CONTROL PLANE                          │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐   │
-│  │ kube-api    │ │ kube-       │ │ kube-controller     │   │
-│  │ server      │ │ scheduler   │ │ manager             │   │
-│  └─────────────┘ └─────────────┘ └─────────────────────┘   │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐    │
+│  │ kube-api    │ │ kube-       │ │ kube-controller     │    │
+│  │ server      │ │ scheduler   │ │ manager             │    │
+│  └─────────────┘ └─────────────┘ └─────────────────────┘    │
 │  ┌─────────────────────────────────────────────────────────┐   │
 │  │                      etcd                            │   │
 │  └─────────────────────────────────────────────────────────┘   │
@@ -26,12 +36,12 @@
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                      WORKER NODE                            │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐   │
-│  │ kubelet     │ │ kube-proxy  │ │ container runtime   │   │
-│  └─────────────┘ └─────────────┘ └─────────────────────┘   │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                 Pods (containers)                    │   │
-│  └─────────────────────────────────────────────────────┘   │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐    │
+│  │ kubelet     │ │ kube-proxy  │ │ container runtime   │    │
+│  └─────────────┘ └─────────────┘ └─────────────────────┘    │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │                 Pods (containers)                   │    │
+│  └─────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -132,8 +142,8 @@ kind delete cluster --name k8s-lab
 
 ## Checklist
 
-- [ ] Docker Desktop rodando
-- [ ] Cluster criado com sucesso
-- [ ] 2 nós visíveis (1 control-plane + 1 worker)
-- [ ] Ambos os nós com status `Ready`
-- [ ] Lens conectado ao cluster (opcional)
+- [x] Docker Desktop rodando
+- [x] Cluster criado com sucesso
+- [x] 2 nós visíveis (1 control-plane + 1 worker)
+- [x] Ambos os nós com status `Ready`
+- [x] Lens conectado ao cluster (opcional)

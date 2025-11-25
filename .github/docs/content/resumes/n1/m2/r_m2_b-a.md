@@ -34,13 +34,9 @@ Nesta aula, exploramos a estratégia de recreate no Kubernetes, que provoca indi
 
 ## 9. Explorando Variável de Ambiente na Aplicação
 
-Commit
-
 Nesta aula, exploramos a camada de configuração no Kubernetes, abordando ConfigMap e Secret. Variáveis de ambiente são essenciais para definir configurações como ambiente, URLs, tokens, etc. Criamos um arquivo .env com variáveis e aprendemos a carregá-lo em uma aplicação Node.js com NestJS. Para garantir segurança, não comitamos o .env no Git. Na próxima aula, configuraremos o .env no ConfigMap do Kubernetes para uso em tempo de execução.
 
 ## 10. Entendendo sobre o ConfigMap
-
-Commit
 
 Nesta aula, exploramos a criação e utilização do objeto ConfigMap no Kubernetes. Iniciamos com a criação do arquivo .env e ajustes no C++ e ML. Em seguida, abordamos a importância de ignorar o .env no versionamento e no build local da imagem. Alteramos o deployment.yaml para RollingUpdate, configuramos réplicas e aplicamos as mudanças. Criamos o ConfigMap app.ts com a variável appname e injetamos no deployment para acessar a informação no pod. Finalizamos com a verificação do funcionamento da injeção de variável no pod.
 

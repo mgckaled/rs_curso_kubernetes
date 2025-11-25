@@ -30,7 +30,7 @@
   - Chrome: 140.0.7339.133
   - Node: 22.19.0
 
-- kind v0.30.0
+- kind v0.30.0 go1.24.6 windows/amd64
 
 - kubeclt:
   - Client Version: v1.34.2
@@ -49,5 +49,6 @@
 ## Recomendações Gerais
 
 - Obedeça a formatação/lint na geração de arquivos markdown (`.md`)
+- NÃO USAR emojis em quaisquer documentos `.md` gerados
 - commits detalhados, porém não muito extenso
 - não faça nenhum tipo de referências ao Claude Code nos texto de commit. sempre remover. ex: 🤖 Generated with [ClaudeCode](https://claude.com/claude-code) Co-Authored-By: Claude <noreply@anthropic.com>".

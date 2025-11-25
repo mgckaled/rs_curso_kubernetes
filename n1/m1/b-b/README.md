@@ -10,6 +10,18 @@
 
 ---
 
+## Documentação Complementar
+
+Este bloco contém documentos de referência na pasta `docs/`:
+
+- **[NAMESPACES.md](docs/NAMESPACES.md)**: Guia completo sobre namespaces no Kubernetes. Explica os namespaces padrão (default, kube-system, kube-public, kube-node-lease), como criar e gerenciar, isolamento de recursos, boas práticas e troubleshooting.
+
+- **[REPLICASET.md](docs/REPLICASET.md)**: Documentação detalhada sobre ReplicaSets. Aborda self-healing, escalabilidade, alta disponibilidade, limitações de atualização de versão e por que usar Deployments em produção.
+
+- **[ACESSO-PODS-SERVICES.md](docs/ACESSO-PODS-SERVICES.md)**: Guia completo sobre formas de acessar pods e services. Cobre port-forward, tipos de Services (ClusterIP, NodePort, LoadBalancer), load balancing, DNS interno e quando usar cada abordagem.
+
+---
+
 ## Estrutura de Arquivos
 
 ```txt
@@ -155,7 +167,14 @@ kubectl get pods -n lab
 kubectl apply -f manifests/03-replicaset.yaml
 
 # Verifique os pods: ainda estão com a versão antiga!
+# Linux/Mac:
 kubectl describe pod <nome-do-pod> -n lab | grep Image
+
+# PowerShell:
+kubectl describe pod <nome-do-pod> -n lab | Select-String "Image"
+
+# Ou verificar diretamente (funciona em qualquer terminal):
+kubectl get pods -n lab -o jsonpath='{.items[*].spec.containers[*].image}'
 ```
 
 > **Aprendizado:** ReplicaSet não atualiza pods existentes. Para atualizações, use Deployment.
@@ -204,7 +223,17 @@ kubectl rollout status deployment/nginx-deployment -n lab
 kubectl rollout history deployment/nginx-deployment -n lab
 
 # Verificar: todos os pods têm a nova versão!
+# Linux/Mac:
 kubectl describe pod <nome-do-pod> -n lab | grep Image
+
+# PowerShell:
+kubectl describe pod <nome-do-pod> -n lab | Select-String "Image"
+
+# Ou verificar todas as imagens diretamente (funciona em qualquer terminal):
+kubectl get pods -n lab -o jsonpath='{.items[*].spec.containers[*].image}'
+
+# Ver formatado com nome do pod e imagem:
+kubectl get pods -n lab -o custom-columns=NAME:.metadata.name,IMAGE:.spec.containers[*].image
 ```
 
 ### Rollback (se necessário)
@@ -240,7 +269,14 @@ kubectl get svc -n lab
 kubectl port-forward svc/nginx-service 8080:80 -n lab
 
 # Testar acesso
+# Linux/Mac:
 curl http://localhost:8080
+
+# PowerShell:
+Invoke-WebRequest http://localhost:8080
+
+# Ou abra no navegador:
+# http://localhost:8080
 ```
 
 ### Ver Endpoints
@@ -248,6 +284,125 @@ curl http://localhost:8080
 ```bash
 # Endpoints são os IPs dos pods selecionados
 kubectl get endpoints nginx-service -n lab
+```
+
+---
+
+## Explorando o Ambiente
+
+Após concluir todas as práticas, use estes comandos para explorar o estado atual do namespace:
+
+### Visão Geral Completa
+
+```bash
+# Ver todos os recursos criados no namespace lab
+kubectl get all -n lab
+
+# Saída esperada:
+# - 3 pods (deployment)
+# - 1 service
+# - 1 deployment
+# - 2 replicasets (atual + histórico)
+```
+
+### Detalhes do Service
+
+```bash
+# Ver detalhes completos do Service
+kubectl describe svc nginx-service -n lab
+
+# Informações mostradas:
+# - Tipo: ClusterIP
+# - IP interno do cluster
+# - Porta e TargetPort
+# - Selector (labels)
+# - Endpoints (IPs dos pods)
+```
+
+### Endpoints e Load Balancing
+
+```bash
+# Ver endpoints (IPs dos pods que o Service roteia)
+kubectl get endpoints nginx-service -n lab
+
+# Mostrar IPs detalhados dos pods
+kubectl get pods -n lab -o wide
+
+# Ver mapeamento completo: nome do pod → IP → imagem
+kubectl get pods -n lab -o custom-columns=NAME:.metadata.name,IP:.status.podIP,IMAGE:.spec.containers[*].image
+```
+
+### Logs e Monitoramento
+
+```bash
+# Ver logs de todos os pods do deployment (últimas 20 linhas)
+kubectl logs -l app=nginx -n lab --tail=20
+
+# Ver logs de um pod específico
+kubectl logs <nome-do-pod> -n lab
+
+# Seguir logs em tempo real
+kubectl logs -l app=nginx -n lab -f
+
+# Ver eventos do namespace
+kubectl get events -n lab --sort-by='.lastTimestamp'
+```
+
+### Histórico e Versões
+
+```bash
+# Ver histórico de rollouts do deployment
+kubectl rollout history deployment/nginx-deployment -n lab
+
+# Ver detalhes de uma revisão específica
+kubectl rollout history deployment/nginx-deployment -n lab --revision=2
+
+# Ver ReplicaSets e suas versões
+kubectl get rs -n lab -o wide
+```
+
+### Relacionamento entre Recursos
+
+```bash
+# Ver hierarquia: Deployment → ReplicaSet → Pods
+kubectl get deployment,rs,pods -n lab
+
+# Ver labels de todos os pods
+kubectl get pods -n lab --show-labels
+
+# Ver quais pods o Service está selecionando
+kubectl get pods -n lab -l app=nginx
+
+# Comparar selector do Service com labels dos pods
+kubectl describe svc nginx-service -n lab | grep -A3 "Selector"
+kubectl get pods -n lab --show-labels
+```
+
+### Testes de Resiliência
+
+```bash
+# Deletar um pod e observar recriação automática
+kubectl delete pod <nome-de-um-pod> -n lab
+
+# Imediatamente verificar status
+kubectl get pods -n lab --watch
+
+# Verificar que o Service ainda funciona
+kubectl port-forward svc/nginx-service 8080:80 -n lab
+# Acessar: http://localhost:8080
+```
+
+### Informações de Recursos
+
+```bash
+# Ver recursos (CPU/memória) dos pods
+kubectl top pods -n lab
+
+# Ver detalhes de configuração de um pod
+kubectl get pod <nome-do-pod> -n lab -o yaml
+
+# Ver apenas a seção de containers
+kubectl get pod <nome-do-pod> -n lab -o jsonpath='{.spec.containers[*]}'
 ```
 
 ---
@@ -294,12 +449,12 @@ kubectl get endpoints nginx-service -n lab
 
 ## Checklist
 
-- [ ] Namespace `lab` criado
-- [ ] Pod criado e acessível via port-forward
-- [ ] Pod deletado não é recriado (efemeridade)
-- [ ] ReplicaSet mantém 3 réplicas
-- [ ] ReplicaSet não atualiza pods existentes (limitação)
-- [ ] Deployment criado com sucesso
-- [ ] Rolling update executado
-- [ ] Service expondo os pods
-- [ ] Acesso via Service funciona
+- [x] Namespace `lab` criado
+- [x] Pod criado e acessível via port-forward
+- [x] Pod deletado não é recriado (efemeridade)
+- [x] ReplicaSet mantém 3 réplicas
+- [x] ReplicaSet não atualiza pods existentes (limitação)
+- [x] Deployment criado com sucesso
+- [x] Rolling update executado
+- [x] Service expondo os pods
+- [x] Acesso via Service funciona

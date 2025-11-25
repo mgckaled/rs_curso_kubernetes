@@ -4,26 +4,26 @@ Repositório pessoal de registro, referência e suporte para fins de aprendizado
 
 ## Tabela de Referência Rápida
 
-| Nível | Módulo | Bloco | Tema | Videoaulas | Quiz |
-|-------|--------|-------|------|------------|------|
-| **N1** | **M1** | **A** | [Conhecendo o Kubernetes](./n1/m1/b-a/) | 8 | [12](./.github/docs/content/assessments/n1/m1/q_m1_b-a.md) |
-| | | **B** | [Orquestrando Containers](./n1/m1/b-b/) | 8 | [10](./.github/docs/content/assessments/n1/m1/q_m1_b-b.md) |
-| | **M2** | **A** | [Explorando Deployment e Aplicação Real](./n1/m2/b-a/) | 11 | 13 |
-| | | **B** | [Conhecendo o HPA](./n1/m2/b-b/) | 12 | 12 |
-| | | **C** | [Probes e Self Healing](./n1/m2/b-c/) | 8 | 10 |
-| | | **D** | [Entendendo mais sobre Volumes](./n1/m2/b-d/) | 8 | 10 |
-| | **-** | **-** | **Avaliação de Nível 1** | **-** | **15** |
-| **N2** | **M1** | **A** | Kubernetes Gerenciado | 15 | - |
-| | | **B** | Conhecendo o RBAC | 13 | - |
-| | **-** | **-** | **Avaliação do Módulo 1** | **-** | **20** |
-| | **M2** | **A** | StatefulSet e DaemonSet | 19 | 10 |
-| | | **B** | Adaptando nosso Pipeline | 9 | 10 |
-| | **-** | **-** | **Avaliação do Módulo 2** | **-** | **20** |
-| **N3** | **M1** | **-** | Explorando a Auto Escala de Nós | 9 | - |
-| | **-** | **-** | **Avaliação do Módulo 1** | **-** | **15** |
-| | **M2** | **A** | Explorando o Karpenter e definindo Roles | 3 | - |
-| | | **B** | Instalação do Karpenter e prática | 6 | - |
-| | **-** | **-** | **Avaliação do Módulo 2** | **-** | **15** |
+| Nível | Módulo | Bloco | Tema | Resumo | Videoaulas | Quiz (n° Questões) |
+|-------|--------|-------|------|--------|------------|------|
+| **N1** | **M1** | **A** | [Conhecendo o Kubernetes](./n1/m1/b-a/) | [Ver](./.github/docs/content/resumes/n1/m1/r_m1_b-a.md) | 8 | [12](./.github/docs/content/assessments/n1/m1/q_m1_b-a.md) |
+| | | **B** | [Orquestrando Containers](./n1/m1/b-b/) | [Ver](./.github/docs/content/resumes/n1/m1/r_m1_b-b.md) | 8 | [10](./.github/docs/content/assessments/n1/m1/q_m1_b-b.md) |
+| | **M2** | **A** | [Explorando Deployment e Aplicação Real](./n1/m2/b-a/) | [Ver](./.github/docs/content/resumes/n1/m2/r_m2_b-a.md) | 11 | [13](./.github/docs/content/assessments/n1/m2/q_m2_b-a.md) |
+| | | **B** | [Conhecendo o HPA](./n1/m2/b-b/) | [Ver](./.github/docs/content/resumes/n1/m2/r_m2_b-b.md) | 12 | [12](./.github/docs/content/assessments/n1/m2/q_m2_b-b.md) |
+| | | **C** | [Probes e Self Healing](./n1/m2/b-c/) | [Ver](./.github/docs/content/resumes/n1/m2/r_m2_b-c.md) | 8 | [10](./.github/docs/content/assessments/n1/m2/q_m2_b-c.md) |
+| | | **D** | [Entendendo mais sobre Volumes](./n1/m2/b-d/) | [Ver](./.github/docs/content/resumes/n1/m2/r_m2_b-d.md) | 8 | [10](./.github/docs/content/assessments/n1/m2/q_m2_b-d.md) |
+| | **-** | **-** | **Avaliação de Nível 1** | **-** | **-** | [**15**](./.github/docs/content/assessments/n1/q_n1.md) |
+| **N2** | **M1** | **A** | Kubernetes Gerenciado | [Ver](./.github/docs/content/resumes/n2/m1/r_m1_b-a.md) | 15 | - |
+| | | **B** | Conhecendo o RBAC | [Ver](./.github/docs/content/resumes/n2/m1/r_m1_b-b.md) | 13 | - |
+| | **-** | **-** | **Avaliação do Módulo 1** | **-** | **-** | [**20**](./.github/docs/content/assessments/n2/m1/q_m1.md) |
+| | **M2** | **A** | StatefulSet e DaemonSet | [Ver](./.github/docs/content/resumes/n2/m2/r_m2_b-a.md) | 19 | 10 |
+| | | **B** | Adaptando nosso Pipeline | [Ver](./.github/docs/content/resumes/n2/m2/r_m2_b-b.md) | 9 | 10 |
+| | **-** | **-** | **Avaliação do Módulo 2** | **-** | **-** | **20** |
+| **N3** | **M1** | **-** | Explorando a Auto Escala de Nós | [Ver](./.github/docs/content/resumes/n3/m1/r_m1_b-u.md) | 9 | - |
+| | **-** | **-** | **Avaliação do Módulo 1** | **-** | **-** | **15** |
+| | **M2** | **A** | Explorando o Karpenter e definindo Roles | [Ver](./.github/docs/content/resumes/n3/m2/r_m2_b-a.md) | 3 | - |
+| | | **B** | Instalação do Karpenter e prática | [Ver](./.github/docs/content/resumes/n3/m2/r_m2_b-b.md) | 6 | - |
+| | **-** | **-** | **Avaliação do Módulo 2** | **-** | **-** | **15** |
 
 ---
 
@@ -39,6 +39,7 @@ Introdução teórica e prática ao Kubernetes: arquitetura de clusters, compone
 
 - **Projeto:** [`n1/m1/b-a/`](./n1/m1/b-a/)
 - **Conteúdo:** Configuração de cluster Kind com 1 control-plane + 1 worker
+- **Resumo Aulas**: [Acesso](./.github/docs/content/resumes/n1/m1/r_m1_b-a.md)
 - **Avaliação:** [Questionário](./.github/docs/content/assessments/n1/m1/q_b-a.md) (12 questões)
 
 #### Bloco B - Orquestrando Containers
@@ -47,6 +48,7 @@ Prática com os principais objetos do Kubernetes: Pods, Namespaces, ReplicaSets,
 
 - **Projeto:** [`n1/m1/b-b/`](./n1/m1/b-b/)
 - **Conteúdo:** Manifests YAML comentados (namespace, pod, replicaset, deployment, service)
+- **Resumo Aulas**: [Acesso](./.github/docs/content/resumes/n1/m1/r_m1_b-b.md)
 - **Avaliação:** [Questionário](./.github/docs/content/assessments/n1/m1/q_b-b.md) (10 questões)
 
 ---
@@ -59,6 +61,7 @@ Deploy de aplicação NestJS com estratégias de atualização (RollingUpdate e 
 
 - **Projeto:** [`n1/m2/b-a/`](./n1/m2/b-a/)
 - **Conteúdo:** Namespace, ConfigMap, Secret, Deployment (RollingUpdate/Recreate), Service ClusterIP
+- **Resumo Aulas**: [Acesso](./.github/docs/content/resumes/n1/m2/r_m2_b-a.md)
 - **Avaliação:** [Questionário](./.github/docs/content/assessments/n1/m2/q_m2_b-a.md) (13 questões)
 
 #### Bloco B - Conhecendo o HPA
@@ -67,6 +70,7 @@ Escalonamento automático com Horizontal Pod Autoscaler: instalação do Metrics
 
 - **Projeto:** [`n1/m2/b-b/`](./n1/m2/b-b/)
 - **Conteúdo:** Metrics Server, HPA v1/v2, behavior policies, Fortio para load testing
+- **Resumo Aulas**: [Acesso](./.github/docs/content/resumes/n1/m2/r_m2_b-a.md)
 - **Avaliação:** [Questionário](./.github/docs/content/assessments/n1/m2/q_m2_b-b.md) (12 questões)
 
 #### Bloco C - Probes e Self Healing
@@ -75,6 +79,7 @@ Monitoramento de saúde com Startup, Readiness e Liveness Probes. Configuração
 
 - **Projeto:** [`n1/m2/b-c/`](./n1/m2/b-c/)
 - **Conteúdo:** Startup/Readiness/Liveness Probes, HTTP/Exec probes, self-healing
+- **Resumo Aulas**: [Acesso](./.github/docs/content/resumes/n1/m2/r_m2_b-c.md)
 - **Avaliação:** [Questionário](./.github/docs/content/assessments/n1/m2/q_m2_b-c.md) (10 questões)
 
 #### Bloco D - Entendendo mais sobre Volumes
@@ -83,4 +88,5 @@ Armazenamento persistente com StorageClass, PersistentVolume e PersistentVolumeC
 
 - **Projeto:** [`n1/m2/b-d/`](./n1/m2/b-d/)
 - **Conteúdo:** StorageClass, PV, PVC, hostPath, emptyDir, volume mounts
+- **Resumo Aulas**: [Acesso](./.github/docs/content/resumes/n1/m2/r_m2_b-d.md)
 - **Avaliação:** [Questionário](./.github/docs/content/assessments/n1/m2/q_m2_b-d.md) (10 questões)

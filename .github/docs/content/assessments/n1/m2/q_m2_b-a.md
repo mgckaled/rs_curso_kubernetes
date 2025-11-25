@@ -6,26 +6,26 @@
 ## Questão 1
 **Sobre as estratégias de deployment no Kubernetes, qual das opções a seguir é a estratégia padrão e qual é a que provoca indisponibilidade durante a atualização?**
 
-**Resposta Correta:** Opção 2 - "Recreate é a estratégia padrão e Rolling Update provoca indisponibilidade."
+**Resposta Correta:** Opção 1 - "Rolling Update é a estratégia padrão e Recreate provoca indisponibilidade."
 
 **Justificativa:**
-Na verdade, a resposta correta para esta questão deveria ser invertida. Rolling Update é a estratégia padrão no Kubernetes, não Recreate. Rolling Update atualiza os pods gradualmente, mantendo a aplicação disponível durante o processo. Já a estratégia Recreate é a que provoca indisponibilidade, pois ela termina todos os pods antigos antes de criar os novos, causando um período de downtime. Esta questão parece ter um erro na formulação das alternativas.
+Rolling Update é a estratégia de deployment padrão no Kubernetes. Ela atualiza os pods de forma gradual e controlada, criando novos pods com a versão atualizada enquanto remove progressivamente os pods antigos, garantindo que a aplicação permaneça disponível durante todo o processo. Por outro lado, a estratégia Recreate causa indisponibilidade intencional: primeiro termina todos os pods da versão antiga e só depois cria os pods da nova versão. Isso resulta em um período de downtime onde nenhum pod está disponível para atender requisições, sendo adequada apenas para cenários específicos onde a coexistência de versões diferentes não é tolerável.
 
 **Análise das alternativas incorretas:**
-- **Opção 1:** Incorreta porque inverte as estratégias - Rolling Update não provoca indisponibilidade.
-- **Opção 3:** Incorreta porque tanto Rolling Update quanto Recreate são estratégias padrão disponíveis, mas Rolling Update é a padrão.
-- **Opção 4:** Incorreta porque Blue-Green não é a estratégia padrão do Kubernetes, é uma técnica avançada.
-- **Opção 5:** Incorreta porque Canary Deployment não é a estratégia padrão e requer configuração adicional.
+**Opção 2:** Incorreta porque inverte completamente a realidade - Recreate não é padrão e Rolling Update não causa indisponibilidade.
+**Opção 3:** Incorreta porque nem Rolling Update nem Recreate são ambas estratégias padrão - apenas Rolling Update é padrão.
+**Opção 4:** Incorreta porque Blue-Green não é uma estratégia nativa padrão do Kubernetes, mas uma técnica avançada implementada separadamente.
+**Opção 5:** Incorreta porque Canary Deployment também não é estratégia padrão e requer configuração adicional de roteamento de tráfego
 
 ---
 
 ## Questão 2
-**Qual é a função da propriedade maxSurge em uma estratégia de Rolling Update?**
+**Qual é a função da propriedade `maxSurge` em uma estratégia de Rolling Update?**
 
 **Resposta Correta:** Opção 2 - "Define o número máximo de pods adicionais que podem ser criados durante a atualização."
 
 **Justificativa:**
-A propriedade maxSurge controla quantos pods extras podem ser criados acima do número desejado durante o processo de Rolling Update. Por exemplo, se você tem 10 réplicas e define maxSurge como 2, o Kubernetes pode criar até 12 pods temporariamente durante a atualização. Isso permite que novos pods sejam iniciados enquanto os antigos ainda estão em execução, garantindo disponibilidade contínua. O valor pode ser especificado como um número absoluto ou uma porcentagem.
+A propriedade `maxSurge` controla quantos pods extras podem ser criados acima do número desejado durante o processo de Rolling Update. Por exemplo, se você tem 10 réplicas e define maxSurge como 2, o Kubernetes pode criar até 12 pods temporariamente durante a atualização. Isso permite que novos pods sejam iniciados enquanto os antigos ainda estão em execução, garantindo disponibilidade contínua. O valor pode ser especificado como um número absoluto ou uma porcentagem.
 
 **Análise das alternativas incorretas:**
 - **Opção 1:** Incorreta porque define pods indisponíveis, não adicionais - isso é função do maxUnavailable.
@@ -36,12 +36,12 @@ A propriedade maxSurge controla quantos pods extras podem ser criados acima do n
 ---
 
 ## Questão 3
-**O que a propriedade maxUnavailable controla em uma estratégia de Rolling Update?**
+**O que a propriedade `maxUnavailable` controla em uma estratégia de Rolling Update?**
 
 **Resposta Correta:** Opção 2 - "O número máximo de pods que podem estar indisponíveis durante a atualização."
 
 **Justificativa:**
-A propriedade maxUnavailable define quantos pods podem estar indisponíveis (não prontos) durante o processo de Rolling Update. Isso controla o ritmo da atualização e garante que um número mínimo de pods permaneça disponível para atender às requisições. Por exemplo, se você tem 10 réplicas e maxUnavailable é 1, o Kubernetes garante que pelo menos 9 pods estejam sempre disponíveis durante a atualização. Pode ser especificado como número absoluto ou porcentagem.
+A propriedade `maxUnavailable` define quantos pods podem estar indisponíveis (não prontos) durante o processo de Rolling Update. Isso controla o ritmo da atualização e garante que um número mínimo de pods permaneça disponível para atender às requisições. Por exemplo, se você tem 10 réplicas e `maxUnavailable` é 1, o Kubernetes garante que pelo menos 9 pods estejam sempre disponíveis durante a atualização. Pode ser especificado como número absoluto ou porcentagem.
 
 **Análise das alternativas incorretas:**
 - **Opção 1:** Incorreta porque se refere a pods adicionais criados, que é função do maxSurge.
@@ -68,7 +68,7 @@ A diferença fundamental entre Recreate e Rolling Update está na forma como lid
 ---
 
 ## Questão 5
-**Em uma estratégia de Rolling Update, o que significa definir maxSurge como 1?**
+**Em uma estratégia de Rolling Update, o que significa definir `maxSurge` como 1?**
 
 **Resposta Correta:** Opção 1 - "Permite a criação de no máximo 1 pod adicional durante a atualização."
 
@@ -76,7 +76,7 @@ A diferença fundamental entre Recreate e Rolling Update está na forma como lid
 Quando maxSurge é definido como 1, o Kubernetes pode criar apenas um pod adicional além do número desejado de réplicas durante o processo de atualização. Por exemplo, se você tem 10 réplicas configuradas, temporariamente poderá haver 11 pods (10 + 1) durante a Rolling Update. Isso controla o ritmo da atualização e o consumo de recursos, pois limita quantos pods extras podem existir simultaneamente no cluster.
 
 **Análise das alternativas incorretas:**
-- **Opção 2:** Incorreta porque não há "1 pod a menos" - maxSurge adiciona pods, não remove.
+- **Opção 2:** Incorreta porque não há "1 pod a menos" - `maxSurge` adiciona pods, não remove.
 - **Opção 3:** Incorreta porque se refere a indisponibilidade, que é função do maxUnavailable.
 - **Opção 4:** Incorreta porque 1% seria especificado como "1%", não "1" - o número 1 representa quantidade absoluta.
 - **Opção 5:** Incorreta porque 1% do total seria uma porcentagem, não um valor absoluto.
@@ -132,15 +132,15 @@ Canary Deployment é uma estratégia de implantação progressiva onde a nova ve
 ---
 
 ## Questão 9
-**Como o maxUnavailable afeta a disponibilidade de uma aplicação durante uma atualização Rolling Update?**
+**Como o `maxUnavailable` afeta a disponibilidade de uma aplicação durante uma atualização Rolling Update?**
 
 **Resposta Correta:** Opção 2 - "Define o número máximo de pods que podem ficar indisponíveis ao mesmo tempo."
 
 **Justificativa:**
-O parâmetro maxUnavailable é crucial para controlar a disponibilidade durante Rolling Updates. Ele estabelece quantos pods podem estar simultaneamente indisponíveis (terminando ou iniciando, mas ainda não prontos) durante o processo de atualização. Por exemplo, com 10 réplicas e maxUnavailable=2, o Kubernetes garante que pelo menos 8 pods estejam sempre disponíveis. Quanto menor o maxUnavailable, mais conservadora é a atualização e maior a garantia de disponibilidade, porém mais lenta será a atualização. Valores maiores aceleram o processo, mas reduzem temporariamente a capacidade de atendimento.
+O parâmetro `maxUnavailable` é crucial para controlar a disponibilidade durante Rolling Updates. Ele estabelece quantos pods podem estar simultaneamente indisponíveis (terminando ou iniciando, mas ainda não prontos) durante o processo de atualização. Por exemplo, com 10 réplicas e `maxUnavailable=2`, o Kubernetes garante que pelo menos 8 pods estejam sempre disponíveis. Quanto menor o `maxUnavailable`, mais conservadora é a atualização e maior a garantia de disponibilidade, porém mais lenta será a atualização. Valores maiores aceleram o processo, mas reduzem temporariamente a capacidade de atendimento.
 
 **Análise das alternativas incorretas:**
-- **Opção 1:** Incorreta porque se refere a pods adicionais criados, que é função do maxSurge.
+- **Opção 1:** Incorreta porque se refere a pods adicionais criados, que é função do `maxSurge`.
 - **Opção 3:** Incorreta porque define pods disponíveis necessários, não o máximo indisponível.
 - **Opção 4:** Incorreta porque se refere a atualização simultânea de todos os pods.
 - **Opção 5:** Incorreta porque se refere a reinício simultâneo, não indisponibilidade durante atualização.
@@ -148,12 +148,12 @@ O parâmetro maxUnavailable é crucial para controlar a disponibilidade durante 
 ---
 
 ## Questão 10
-**Qual é a função da propriedade maxSurge quando definida como 20% em um Rolling Update com 10 pods?**
+**Qual é a função da propriedade `maxSurge` quando definida como 20% em um Rolling Update com 10 pods?**
 
 **Resposta Correta:** Opção 1 - "Permite que até 2 pods adicionais sejam criados durante a atualização."
 
 **Justificativa:**
-Quando maxSurge é definido como porcentagem, ele é calculado com base no número total de réplicas desejadas. Com 10 pods e maxSurge=20%, o Kubernetes calcula 20% de 10, que resulta em 2 pods. Isso significa que durante a atualização, temporariamente podem existir até 12 pods (10 originais + 2 adicionais). Os 2 pods extras permitem que novas versões sejam iniciadas antes que as antigas sejam terminadas, garantindo capacidade suficiente durante a transição. Após os novos pods estarem prontos, os antigos são gradualmente removidos.
+Quando maxSurge é definido como porcentagem, ele é calculado com base no número total de réplicas desejadas. Com 10 pods e `maxSurge=20%`, o Kubernetes calcula 20% de 10, que resulta em 2 pods. Isso significa que durante a atualização, temporariamente podem existir até 12 pods (10 originais + 2 adicionais). Os 2 pods extras permitem que novas versões sejam iniciadas antes que as antigas sejam terminadas, garantindo capacidade suficiente durante a transição. Após os novos pods estarem prontos, os antigos são gradualmente removidos.
 
 **Análise das alternativas incorretas:**
 - **Opção 2:** Incorreta porque não é "até 2 pods indisponíveis" - maxSurge adiciona pods extras.
@@ -180,31 +180,31 @@ ConfigMap é um objeto do Kubernetes projetado para armazenar dados de configura
 ---
 
 ## Questão 12
-**Qual é a principal diferença entre o uso de env e envFrom no Kubernetes?**
+**Qual é a principal diferença entre o uso de `env` e `envFrom` no Kubernetes?**
 
-**Resposta Correta:** Opção 1 - "O env injeta variáveis de ambiente manualmente uma por uma, enquanto o envFrom injeta todas as variáveis de uma só vez a partir de ConfigMaps ou Secrets."
+**Resposta Correta:** Opção 1 - "O `env` injeta variáveis de ambiente manualmente uma por uma, enquanto o `envFrom` injeta todas as variáveis de uma só vez a partir de ConfigMaps ou Secrets."
 
 **Justificativa:**
-A diferença fundamental está na granularidade e no método de injeção. Com 'env', você precisa mapear explicitamente cada variável individualmente, especificando qual chave do ConfigMap ou Secret corresponde a qual variável de ambiente no container. Isso oferece controle preciso, mas pode ser trabalhoso quando há muitas variáveis. Já 'envFrom' importa todas as chaves de um ConfigMap ou Secret de uma só vez, criando automaticamente variáveis de ambiente com os mesmos nomes das chaves. Isso é mais conveniente para configurações grandes, mas oferece menos controle sobre renomeação de variáveis.
+A diferença fundamental está na granularidade e no método de injeção. Com `env`, você precisa mapear explicitamente cada variável individualmente, especificando qual chave do ConfigMap ou Secret corresponde a qual variável de ambiente no container. Isso oferece controle preciso, mas pode ser trabalhoso quando há muitas variáveis. Já `envFrom` importa todas as chaves de um ConfigMap ou Secret de uma só vez, criando automaticamente variáveis de ambiente com os mesmos nomes das chaves. Isso é mais conveniente para configurações grandes, mas oferece menos controle sobre renomeação de variáveis.
 
 **Análise das alternativas incorretas:**
-- **Opção 2:** Incorreta porque 'env' funciona tanto com ConfigMaps quanto com Secrets.
-- **Opção 3:** Incorreta porque inverte as funções - 'envFrom' injeta volumes, 'env' variáveis.
-- **Opção 4:** Incorreta porque 'env' permite injeção automática através de valueFrom.
-- **Opção 5:** Incorreta porque inverte os papéis - 'envFrom' acessa serviços externos através das configs.
+- **Opção 2:** Incorreta porque `env` funciona tanto com ConfigMaps quanto com Secrets.
+- **Opção 3:** Incorreta porque inverte as funções - `envFrom` injeta volumes, `env` variáveis.
+- **Opção 4:** Incorreta porque 'env' permite injeção automática através de `valueFrom`.
+- **Opção 5:** Incorreta porque inverte os papéis - `envFrom` acessa serviços externos através das configs.
 
 ---
 
 ## Questão 13
-**Por que pode ser necessário alterar os nomes das chaves em um ConfigMap ou Secret ao usar envFrom?**
+**Por que pode ser necessário alterar os nomes das chaves em um ConfigMap ou Secret ao usar `envFrom`?**
 
 **Resposta Correta:** Opção 2 - "Para garantir que os nomes das variáveis injetadas correspondam aos nomes esperados pela aplicação."
 
 **Justificativa:**
-Quando se usa 'envFrom', as chaves do ConfigMap ou Secret tornam-se os nomes das variáveis de ambiente no container. No entanto, a aplicação pode esperar variáveis com nomes específicos que não correspondem exatamente às chaves definidas no ConfigMap. Por exemplo, o ConfigMap pode ter uma chave 'database.url', mas a aplicação espera 'DATABASE_URL'. Nestes casos, é necessário ajustar os nomes das chaves no ConfigMap ou usar 'env' com mapeamento explícito ao invés de 'envFrom'. Isso garante compatibilidade entre as configurações armazenadas no Kubernetes e as expectativas da aplicação.
+Quando se usa `envFrom`, as chaves do ConfigMap ou Secret tornam-se os nomes das variáveis de ambiente no container. No entanto, a aplicação pode esperar variáveis com nomes específicos que não correspondem exatamente às chaves definidas no ConfigMap. Por exemplo, o ConfigMap pode ter uma chave `database.url`, mas a aplicação espera `DATABASE_URL`. Nestes casos, é necessário ajustar os nomes das chaves no ConfigMap ou usar 'env' com mapeamento explícito ao invés de `envFrom`. Isso garante compatibilidade entre as configurações armazenadas no Kubernetes e as expectativas da aplicação.
 
 **Análise das alternativas incorretas:**
 - **Opção 1:** Incorreta porque Kubernetes não exige prefixos específicos nas chaves.
 - **Opção 3:** Incorreta porque o objetivo não é evitar conflito entre ConfigMaps e Secrets.
-- **Opção 4:** Incorreta porque 'envFrom' não requer caracteres especiais - aceita vários formatos.
-- **Opção 5:** Incorreta porque 'envFrom' não remove valores secretos - mantém as referências.
+- **Opção 4:** Incorreta porque `envFrom` não requer caracteres especiais - aceita vários formatos.
+- **Opção 5:** Incorreta porque `envFrom` não remove valores secretos - mantém as referências.

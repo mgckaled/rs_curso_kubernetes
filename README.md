@@ -2,6 +2,29 @@
 
 Repositório pessoal de registro, referência e suporte para fins de aprendizado, consulta e acompanhamento do Curso de Formação em Kuberbetes, desenvolvido pela Faculdade de Tecnologia Rocketseat (FTR).
 
+## Tabela de Referência Rápida
+
+| Nível | Módulo | Bloco | Tema | Videoaulas | Quiz |
+|-------|--------|-------|------|------------|------|
+| **N1** | **M1** | **A** | [Conhecendo o Kubernetes](./n1/m1/b-a/) | 8 | [12](./.github/docs/content/assessments/n1/m1/q_m1_b-a.md) |
+| | | **B** | [Orquestrando Containers](./n1/m1/b-b/) | 8 | [10](./.github/docs/content/assessments/n1/m1/q_m1_b-b.md) |
+| | **M2** | **A** | [Explorando Deployment e Aplicação Real](./n1/m2/b-a/) | 11 | 13 |
+| | | **B** | [Conhecendo o HPA](./n1/m2/b-b/) | 12 | 12 |
+| | | **C** | [Probes e Self Healing](./n1/m2/b-c/) | 8 | 10 |
+| | | **D** | [Entendendo mais sobre Volumes](./n1/m2/b-d/) | 8 | 10 |
+| | **-** | **-** | **Avaliação de Nível 1** | **-** | **15** |
+| **N2** | **M1** | **A** | Kubernetes Gerenciado | 15 | - |
+| | | **B** | Conhecendo o RBAC | 13 | - |
+| | **-** | **-** | **Avaliação do Módulo 1** | **-** | **20** |
+| | **M2** | **A** | StatefulSet e DaemonSet | 19 | 10 |
+| | | **B** | Adaptando nosso Pipeline | 9 | 10 |
+| | **-** | **-** | **Avaliação do Módulo 2** | **-** | **20** |
+| **N3** | **M1** | **-** | Explorando a Auto Escala de Nós | 9 | - |
+| | **-** | **-** | **Avaliação do Módulo 1** | **-** | **15** |
+| | **M2** | **A** | Explorando o Karpenter e definindo Roles | 3 | - |
+| | | **B** | Instalação do Karpenter e prática | 6 | - |
+| | **-** | **-** | **Avaliação do Módulo 2** | **-** | **15** |
+
 ---
 
 ## Nível 1 - Fundamentos do Kubernetes

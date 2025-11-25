@@ -11,6 +11,14 @@
 
 ---
 
+## Documentação Complementar
+
+Este bloco contém documentos de referência na pasta `docs/`:
+
+- **[SECRETS.md](docs/SECRETS.md)**: Guia completo sobre Secrets no Kubernetes. Explica Base64, como criar e codificar senhas (PowerShell/Bash), tipos de Secrets (Opaque, TLS, Docker), uso em Pods, scripts de geração automática, boas práticas de segurança (RBAC, Encryption at Rest) e ferramentas externas (Sealed Secrets, External Secrets Operator, SOPS).
+
+---
+
 ## Estrutura de Arquivos
 
 ```txt
@@ -47,9 +55,60 @@ docker images | grep demo-api
 kind load docker-image demo-api:v1 --name k8s-lab
 ```
 
+### 3. Verificar se a Imagem foi Carregada
+
+#### Opção 1: Buscar pela imagem específica
+
+**PowerShell (Windows):**
+
+```powershell
+docker exec k8s-lab-control-plane crictl images | Select-String "demo-api"
+docker exec k8s-lab-worker crictl images | Select-String "demo-api"
+```
+
+**Bash (Linux/Mac):**
+
+```bash
+docker exec k8s-lab-control-plane crictl images | grep demo-api
+docker exec k8s-lab-worker crictl images | grep demo-api
+```
+
+Saída esperada:
+
+```cmd
+docker.io/library/demo-api    v1    eaa52b6d182cb    258MB
+```
+
+#### Opção 2: Listar todas as imagens
+
+```bash
+# Ver todas as imagens no control-plane
+docker exec k8s-lab-control-plane crictl images
+
+# Ver todas as imagens no worker
+docker exec k8s-lab-worker crictl images
+```
+
+#### Opção 3: Testar com pod temporário
+
+```bash
+# Criar pod de teste (força uso da imagem local)
+kubectl run test-demo --image=demo-api:v1 --image-pull-policy=Never -n demo
+
+# Verificar se o pod iniciou
+kubectl get pods -n demo
+
+# Se Running, a imagem está carregada! Limpar:
+kubectl delete pod test-demo -n demo
+```
+
 ---
 
 ## Prática 1: Namespace
+
+```bash
+cd cd .\n1\m2\b-a
+```
 
 ```bash
 kubectl apply -f manifests/01-namespace.yaml
@@ -82,11 +141,40 @@ kubectl apply -f manifests/03-secret.yaml
 # Verificar Secret criado
 kubectl get secret -n demo
 
-# Ver detalhes (valores em base64)
+# Ver detalhes (valores ocultos, apenas tamanho)
 kubectl describe secret demo-api-secret -n demo
+```
 
-# Decodificar um valor
+### Decodificar valores do Secret
+
+**PowerShell (Windows):**
+
+```powershell
+# Decodificar DB_PASSWORD
+$base64 = kubectl get secret demo-api-secret -n demo -o jsonpath='{.data.DB_PASSWORD}'
+[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($base64))
+
+# Decodificar API_KEY
+$base64 = kubectl get secret demo-api-secret -n demo -o jsonpath='{.data.API_KEY}'
+[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($base64))
+
+# Decodificar todos os valores
+kubectl get secret demo-api-secret -n demo -o json | ConvertFrom-Json | Select-Object -ExpandProperty data | ForEach-Object { $_.PSObject.Properties | ForEach-Object { "$($_.Name): $([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_.Value)))" } }
+```
+
+**Bash (Linux/Mac):**
+
+```bash
+# Decodificar DB_PASSWORD
 kubectl get secret demo-api-secret -n demo -o jsonpath='{.data.DB_PASSWORD}' | base64 -d
+echo ""
+
+# Decodificar API_KEY
+kubectl get secret demo-api-secret -n demo -o jsonpath='{.data.API_KEY}' | base64 -d
+echo ""
+
+# Decodificar todos os valores (requer jq)
+kubectl get secret demo-api-secret -n demo -o json | jq -r '.data | to_entries[] | "\(.key): \(.value | @base64d)"'
 ```
 
 ---

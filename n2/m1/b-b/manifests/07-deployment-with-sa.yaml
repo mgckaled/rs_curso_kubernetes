@@ -1,0 +1,124 @@
+# =============================================================================
+# Deployment com ServiceAccount Customizado
+# =============================================================================
+# Demonstra como configurar pods para usar ServiceAccount especifico
+# com permissoes RBAC customizadas.
+#
+# IMPORTANTE:
+# - Por padrao, pods usam ServiceAccount 'default' do namespace
+# - Pratica recomendada: criar SA dedicado com permissoes minimas
+# - Pod herda permissoes do SA via token montado automaticamente
+#
+# Cenario: deploy demo-api usando ServiceAccount 'app-reader'
+# Resultado: pod pode listar pods via Kubernetes API (permissao da Role)
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: demo-api-rbac
+  namespace: dev
+  labels:
+    app: demo-api
+    purpose: rbac-demo
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-api-rbac
+
+  template:
+    metadata:
+      labels:
+        app: demo-api-rbac
+
+    spec:
+      # ================================================================
+      # SERVICE ACCOUNT - Identidade do Pod
+      # ================================================================
+      # Especifica qual ServiceAccount o pod deve usar
+      # Token e montado automaticamente em:
+      # /var/run/secrets/kubernetes.io/serviceaccount/
+      serviceAccountName: app-reader
+
+      # ================================================================
+      # OPCIONAL: Controlar montagem automatica do token
+      # ================================================================
+      # Se app nao precisa acessar Kubernetes API, desabilitar para seguranca:
+      # automountServiceAccountToken: false
+
+      containers:
+        - name: demo-api
+          image: demo-api:v1
+          imagePullPolicy: Never
+
+          ports:
+            - name: http
+              containerPort: 3000
+
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3000"
+
+          # Probes basicas
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+
+# =============================================================================
+# COMO O TOKEN E USADO
+# =============================================================================
+# 1. Kubernetes monta automaticamente Secret do SA no pod:
+#    /var/run/secrets/kubernetes.io/serviceaccount/
+#    - token: JWT token para autenticacao
+#    - ca.crt: certificado CA do cluster
+#    - namespace: namespace do pod
+#
+# 2. Apps podem ler token e fazer requisicoes ao API Server:
+#    TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+#    curl -H "Authorization: Bearer $TOKEN" \
+#      --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+#      https://kubernetes.default.svc/api/v1/namespaces/dev/pods
+#
+# 3. kubectl dentro do pod usa token automaticamente:
+#    kubectl get pods  # usa ServiceAccount do pod
+# =============================================================================
+
+# =============================================================================
+# TESTANDO PERMISSOES DO POD
+# =============================================================================
+# 1. Entrar no pod:
+#    kubectl exec -it -n dev $(kubectl get pod -n dev -l app=demo-api-rbac -o jsonpath='{.items[0].metadata.name}') -- sh
+#
+# 2. Verificar ServiceAccount:
+#    cat /var/run/secrets/kubernetes.io/serviceaccount/token
+#
+# 3. Testar permissoes (se kubectl estiver instalado):
+#    kubectl auth can-i list pods
+#    # Resultado: yes (tem permissao via Role pod-reader)
+#
+#    kubectl auth can-i create pods
+#    # Resultado: no (nao tem permissao)
+# =============================================================================

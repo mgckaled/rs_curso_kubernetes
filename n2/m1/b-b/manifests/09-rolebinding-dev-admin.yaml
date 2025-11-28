@@ -1,0 +1,25 @@
+# =============================================================================
+# RoleBinding - Administrador do Namespace Dev
+# =============================================================================
+# Vincula Role 'pod-manager' a um usuario admin do namespace.
+# =============================================================================
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+
+metadata:
+  name: dev-admin-binding
+  namespace: dev
+  labels:
+    purpose: rbac-demo
+
+spec:
+  subjects:
+    - kind: User
+      name: dev-admin
+      apiGroup: rbac.authorization.k8s.io
+
+  roleRef:
+    kind: Role
+    name: pod-manager
+    apiGroup: rbac.authorization.k8s.io

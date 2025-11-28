@@ -1,4 +1,4 @@
-# Resumo Aulas Nível 2 Módulo 1: Bloco B
+# Resumo Aulas Nível 2 Módulo 1: Bloco B - Conhecendo o RBAC
 
 ## 1. Aplicando TF na Nossa Estrutura na AWS
 

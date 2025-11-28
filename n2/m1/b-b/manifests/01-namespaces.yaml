@@ -1,0 +1,35 @@
+# =============================================================================
+# Namespaces - Isolamento Logico para RBAC
+# =============================================================================
+# Namespaces fornecem isolamento de recursos e permitem aplicar RBAC
+# de forma granular. Roles e RoleBindings sao namespace-scoped, ou seja,
+# suas permissoes se aplicam apenas dentro do namespace onde foram criadas.
+#
+# Cenario: criar namespaces dev e prod para demonstrar RBAC
+# =============================================================================
+
+---
+# Namespace de Desenvolvimento
+apiVersion: v1
+kind: Namespace
+metadata:
+  # Nome do namespace
+  name: dev
+  # Labels para organizacao e selecao
+  labels:
+    environment: development
+    purpose: rbac-demo
+    team: platform
+
+---
+# Namespace de Producao
+apiVersion: v1
+kind: Namespace
+metadata:
+  # Nome do namespace
+  name: prod
+  # Labels
+  labels:
+    environment: production
+    purpose: rbac-demo
+    team: platform

@@ -1,0 +1,186 @@
+# =============================================================================
+# ClusterRole - Permissoes em Nivel de Cluster
+# =============================================================================
+# ClusterRole define permissoes que se aplicam:
+# 1. Em todo o cluster (recursos cluster-scoped como nodes, persistentvolumes)
+# 2. Em todos os namespaces (quando usado com ClusterRoleBinding)
+# 3. Em namespaces especificos (quando usado com RoleBinding)
+#
+# QUANDO USAR CLUSTERROLE:
+# - Recursos cluster-scoped (nodes, clusterroles, persistentvolumes)
+# - Endpoints non-resource (/healthz, /metrics, /api/*)
+# - Acesso a recursos em multiplos namespaces
+# - Reutilizacao de permissoes via RoleBinding
+#
+# CLUSTERROLE vs ROLE:
+# - ClusterRole: pode acessar recursos cluster-scoped, reutilizavel
+# - Role: limitada a um namespace, nao pode acessar recursos cluster-scoped
+#
+# Cenario: ClusterRole para ler nodes (recurso cluster-scoped)
+# =============================================================================
+
+# Versao da API RBAC
+apiVersion: rbac.authorization.k8s.io/v1
+
+# Tipo do recurso
+kind: ClusterRole
+
+# Metadados
+metadata:
+  # Nome da ClusterRole
+  # IMPORTANTE: ClusterRole nao tem namespace (e cluster-wide)
+  name: node-reader
+  # Labels
+  labels:
+    purpose: rbac-demo
+    access-type: read-only
+    scope: cluster
+
+# Especificacao das Permissoes
+spec:
+  # ================================================================
+  # RULES - Regras de Permissao
+  # ================================================================
+  rules:
+    # ================================================================
+    # Regra 1: Ler Nodes
+    # ================================================================
+    # Nodes sao recursos cluster-scoped (nao pertencem a namespace)
+    # Apenas ClusterRole pode conceder permissoes sobre nodes
+    - apiGroups:
+        # "" = core API group
+        - ""
+      # Recursos cluster-scoped
+      resources:
+        # nodes: maquinas do cluster (control-plane, workers)
+        - nodes
+        # node status
+        - nodes/status
+      # Acoes permitidas
+      verbs:
+        # get: ler um node especifico
+        - get
+        # list: listar todos os nodes
+        - list
+        # watch: monitorar mudancas
+        - watch
+
+    # ================================================================
+    # Regra 2: Ler PersistentVolumes (outro recurso cluster-scoped)
+    # ================================================================
+    - apiGroups:
+        - ""
+      resources:
+        # PersistentVolumes (PV) sao cluster-scoped
+        # PersistentVolumeClaims (PVC) sao namespace-scoped
+        - persistentvolumes
+      verbs:
+        - get
+        - list
+
+# =============================================================================
+# RECURSOS CLUSTER-SCOPED vs NAMESPACE-SCOPED
+# =============================================================================
+# CLUSTER-SCOPED (requerem ClusterRole):
+# - nodes
+# - persistentvolumes
+# - clusterroles
+# - clusterrolebindings
+# - storageclasses
+# - namespaces
+#
+# NAMESPACE-SCOPED (podem usar Role ou ClusterRole):
+# - pods
+# - services
+# - deployments
+# - configmaps
+# - secrets
+# - persistentvolumeclaims
+# - roles
+# - rolebindings
+# =============================================================================
+
+# =============================================================================
+# CLUSTERROLE PRE-DEFINIDAS DO KUBERNETES
+# =============================================================================
+# Kubernetes vem com ClusterRoles pre-definidas:
+#
+# cluster-admin: super-usuario (todas permissoes)
+# - Uso: apenas para emergencias, nunca para apps
+# - kubectl get clusterrole cluster-admin -o yaml
+#
+# admin: controle total em namespaces
+# - Pode criar/modificar recursos (exceto namespace e quotas)
+# - kubectl get clusterrole admin -o yaml
+#
+# edit: modificar recursos comuns
+# - Pode create/update/delete recursos (exceto RBAC)
+# - kubectl get clusterrole edit -o yaml
+#
+# view: leitura de recursos comuns
+# - Pode get/list/watch recursos (exceto secrets)
+# - kubectl get clusterrole view -o yaml
+#
+# Exemplo de uso:
+# kubectl create rolebinding alice-admin \
+#   --clusterrole=admin \
+#   --user=alice \
+#   --namespace=dev
+# =============================================================================
+
+# =============================================================================
+# AGREGACAO DE CLUSTERROLES
+# =============================================================================
+# ClusterRoles podem ser agregadas via labels.
+# Util para estender roles pre-definidas sem modifica-las.
+#
+# Exemplo: agregar permissoes customizadas a ClusterRole 'view'
+#
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRole
+# metadata:
+#   name: custom-view-extension
+#   labels:
+#     # Esta label faz com que permissoes sejam agregadas a 'view'
+#     rbac.authorization.k8s.io/aggregate-to-view: "true"
+# rules:
+#   - apiGroups: ["custom.io"]
+#     resources: ["widgets"]
+#     verbs: ["get", "list"]
+# =============================================================================
+
+# =============================================================================
+# TESTANDO ESTA CLUSTERROLE
+# =============================================================================
+# Apos criar ClusterRoleBinding (proximo passo):
+#
+# kubectl auth can-i list nodes --as=viewer-user --as-group=viewers
+#
+# Resultado esperado: yes
+#
+# kubectl auth can-i delete nodes --as=viewer-user --as-group=viewers
+#
+# Resultado esperado: no (delete nao esta nos verbs)
+#
+# Ver detalhes da ClusterRole:
+#
+# kubectl describe clusterrole node-reader
+# =============================================================================
+
+# =============================================================================
+# EXEMPLO: ClusterRole para Endpoints Non-Resource
+# =============================================================================
+# Non-resource URLs sao endpoints da API que nao correspondem a recursos:
+# /healthz, /metrics, /api/*, /version, etc
+#
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRole
+# metadata:
+#   name: health-checker
+# rules:
+#   - nonResourceURLs:
+#       - /healthz
+#       - /healthz/*
+#     verbs:
+#       - get
+# =============================================================================

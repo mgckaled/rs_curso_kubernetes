@@ -1,0 +1,176 @@
+# =============================================================================
+# RoleBinding - Liga Role a Subjects (Users, Groups, ServiceAccounts)
+# =============================================================================
+# RoleBinding concede as permissoes definidas em uma Role (ou ClusterRole)
+# a um ou mais subjects dentro de um namespace especifico.
+#
+# IMPORTANTE:
+# - RoleBinding e namespace-scoped (mesmo vinculando ClusterRole)
+# - Um RoleBinding pode referenciar Role ou ClusterRole
+# - Ao referenciar ClusterRole, permissoes sao limitadas ao namespace do RoleBinding
+#
+# Cenario: vincular Role 'pod-reader' ao ServiceAccount 'app-reader'
+# Resultado: ServiceAccount 'app-reader' pode ler pods no namespace dev
+# =============================================================================
+
+# Versao da API RBAC
+apiVersion: rbac.authorization.k8s.io/v1
+
+# Tipo do recurso
+kind: RoleBinding
+
+# Metadados
+metadata:
+  # Nome do RoleBinding
+  name: app-reader-binding
+  # Namespace onde o RoleBinding se aplica
+  namespace: dev
+  # Labels
+  labels:
+    purpose: rbac-demo
+    role-type: read-only
+
+# Especificacao
+spec:
+  # ================================================================
+  # SUBJECTS - A quem conceder permissoes
+  # ================================================================
+  # Lista de subjects (usuarios, grupos, service accounts)
+  subjects:
+    # ================================================================
+    # ServiceAccount
+    # ================================================================
+    - kind: ServiceAccount
+      # Nome do ServiceAccount
+      name: app-reader
+      # Namespace do ServiceAccount
+      # IMPORTANTE: ServiceAccount deve estar no mesmo namespace
+      namespace: dev
+
+    # ================================================================
+    # EXEMPLO: Multiplos Subjects
+    # ================================================================
+    # Pode adicionar mais subjects (usuarios, grupos, etc):
+    #
+    # - kind: User
+    #   name: alice
+    #   apiGroup: rbac.authorization.k8s.io
+    #
+    # - kind: Group
+    #   name: developers
+    #   apiGroup: rbac.authorization.k8s.io
+    #
+    # - kind: ServiceAccount
+    #   name: another-sa
+    #   namespace: dev
+
+  # ================================================================
+  # ROLEREF - Referencia a Role ou ClusterRole
+  # ================================================================
+  roleRef:
+    # Tipo de Role (Role ou ClusterRole)
+    kind: Role
+    # Nome da Role a ser vinculada
+    name: pod-reader
+    # API Group (sempre rbac.authorization.k8s.io para RBAC)
+    apiGroup: rbac.authorization.k8s.io
+
+  # ================================================================
+  # IMPORTANTE: roleRef e IMUTAVEL
+  # ================================================================
+  # Nao e possivel alterar roleRef apos criacao
+  # Para vincular a outra Role, deletar e recriar o RoleBinding
+
+# =============================================================================
+# SUBJECT KINDS
+# =============================================================================
+# User: usuario humano (gerenciado fora do K8s, ex: via certificados, OIDC)
+# - kind: User
+#   name: alice@example.com
+#   apiGroup: rbac.authorization.k8s.io
+#
+# Group: grupo de usuarios
+# - kind: Group
+#   name: developers
+#   apiGroup: rbac.authorization.k8s.io
+#
+# ServiceAccount: identidade de processo em pods
+# - kind: ServiceAccount
+#   name: app-reader
+#   namespace: dev
+# =============================================================================
+
+# =============================================================================
+# ROLEBINDING vs CLUSTERROLEBINDING
+# =============================================================================
+# | Aspecto          | RoleBinding         | ClusterRoleBinding        |
+# |------------------|---------------------|---------------------------|
+# | Escopo           | Namespace           | Cluster inteiro           |
+# | Pode vincular    | Role ou ClusterRole | Apenas ClusterRole        |
+# | Permissoes em    | Um namespace        | Todos os namespaces       |
+# | Uso comum        | Acesso segmentado   | Admins, viewers globais   |
+# =============================================================================
+#
+# Exemplo: RoleBinding vinculando ClusterRole
+# - Permite reutilizar ClusterRole (ex: 'view', 'edit') em namespaces
+# - Permissoes se aplicam APENAS ao namespace do RoleBinding
+#
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: RoleBinding
+# metadata:
+#   name: alice-viewer
+#   namespace: dev
+# subjects:
+#   - kind: User
+#     name: alice
+#     apiGroup: rbac.authorization.k8s.io
+# roleRef:
+#   kind: ClusterRole  # Referenciando ClusterRole
+#   name: view         # ClusterRole pre-definida do K8s
+#   apiGroup: rbac.authorization.k8s.io
+# =============================================================================
+
+# =============================================================================
+# TESTANDO ESTE ROLEBINDING
+# =============================================================================
+# Verificar se ServiceAccount tem permissoes:
+#
+# kubectl auth can-i list pods \
+#   --as=system:serviceaccount:dev:app-reader \
+#   --namespace=dev
+#
+# Saida esperada: yes
+#
+# Testar em outro namespace (deve falhar):
+#
+# kubectl auth can-i list pods \
+#   --as=system:serviceaccount:dev:app-reader \
+#   --namespace=prod
+#
+# Saida esperada: no
+#
+# Ver detalhes do RoleBinding:
+#
+# kubectl describe rolebinding app-reader-binding -n dev
+# =============================================================================
+
+# =============================================================================
+# DEBUGGING
+# =============================================================================
+# Se permissoes nao funcionam, verificar:
+#
+# 1. RoleBinding existe no namespace correto:
+#    kubectl get rolebinding app-reader-binding -n dev
+#
+# 2. Role existe e tem permissoes corretas:
+#    kubectl describe role pod-reader -n dev
+#
+# 3. ServiceAccount existe:
+#    kubectl get sa app-reader -n dev
+#
+# 4. Subjects estao corretos no RoleBinding:
+#    kubectl get rolebinding app-reader-binding -n dev -o yaml
+#
+# 5. Testar com kubectl auth can-i:
+#    kubectl auth can-i list pods --as=system:serviceaccount:dev:app-reader -n dev
+# =============================================================================

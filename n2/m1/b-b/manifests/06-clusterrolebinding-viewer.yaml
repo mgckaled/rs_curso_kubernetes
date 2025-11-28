@@ -1,0 +1,124 @@
+# =============================================================================
+# ClusterRoleBinding - Liga ClusterRole a Subjects em Todo o Cluster
+# =============================================================================
+# ClusterRoleBinding concede permissoes definidas em ClusterRole a subjects
+# em TODO O CLUSTER (todos os namespaces + recursos cluster-scoped).
+#
+# CUIDADO:
+# - ClusterRoleBinding concede acesso AMPLO
+# - Use com cautela, prefira RoleBinding quando possivel
+# - Nunca vincule cluster-admin a grupos amplos (system:authenticated)
+#
+# CLUSTERROLEBINDING vs ROLEBINDING:
+# - ClusterRoleBinding: permissoes em todo o cluster
+# - RoleBinding: permissoes em um namespace (mesmo com ClusterRole)
+#
+# Cenario: vincular ClusterRole 'node-reader' ao grupo 'viewers'
+# Resultado: usuarios do grupo 'viewers' podem ler nodes em todo cluster
+# =============================================================================
+
+# Versao da API RBAC
+apiVersion: rbac.authorization.k8s.io/v1
+
+# Tipo do recurso
+kind: ClusterRoleBinding
+
+# Metadados
+metadata:
+  # Nome do ClusterRoleBinding
+  # IMPORTANTE: ClusterRoleBinding nao tem namespace (e cluster-wide)
+  name: viewer-binding
+  # Labels
+  labels:
+    purpose: rbac-demo
+    scope: cluster
+
+# Especificacao
+spec:
+  # ================================================================
+  # SUBJECTS - A quem conceder permissoes
+  # ================================================================
+  subjects:
+    # ================================================================
+    # Group - Grupo de Usuarios
+    # ================================================================
+    - kind: Group
+      # Nome do grupo
+      name: viewers
+      # API Group para RBAC
+      apiGroup: rbac.authorization.k8s.io
+
+    # ================================================================
+    # EXEMPLO: Multiplos Subjects
+    # ================================================================
+    # - kind: User
+    #   name: alice
+    #   apiGroup: rbac.authorization.k8s.io
+    #
+    # - kind: ServiceAccount
+    #   name: monitoring-sa
+    #   namespace: monitoring
+
+  # ================================================================
+  # ROLEREF - Referencia a ClusterRole
+  # ================================================================
+  roleRef:
+    # Tipo (ClusterRoleBinding sempre referencia ClusterRole)
+    kind: ClusterRole
+    # Nome da ClusterRole
+    name: node-reader
+    # API Group
+    apiGroup: rbac.authorization.k8s.io
+
+# =============================================================================
+# GRUPOS ESPECIAIS DO KUBERNETES
+# =============================================================================
+# system:authenticated: todos os usuarios autenticados
+# - CUIDADO: nao usar com cluster-admin ou permissoes amplas
+#
+# system:unauthenticated: usuarios nao autenticados
+# - Raramente usado, evitar
+#
+# system:serviceaccounts: todos os ServiceAccounts do cluster
+# - CUIDADO: nunca dar permissoes amplas
+#
+# system:serviceaccounts:<namespace>: todos SAs de um namespace
+# - Exemplo: system:serviceaccounts:kube-system
+# =============================================================================
+
+# =============================================================================
+# EXEMPLO: ClusterRoleBinding Perigoso (EVITAR)
+# =============================================================================
+# NÃO FAZER:
+#
+# subjects:
+#   - kind: Group
+#     name: system:authenticated  # TODOS usuarios autenticados
+#     apiGroup: rbac.authorization.k8s.io
+# roleRef:
+#   kind: ClusterRole
+#   name: cluster-admin  # Super-usuario
+#   apiGroup: rbac.authorization.k8s.io
+#
+# Problema: da acesso total a qualquer usuario autenticado!
+# =============================================================================
+
+# =============================================================================
+# TESTANDO ESTE CLUSTERROLEBINDING
+# =============================================================================
+# Simular usuario do grupo 'viewers':
+#
+# kubectl auth can-i list nodes --as=viewer-user --as-group=viewers
+#
+# Resultado esperado: yes
+#
+# Testar em recursos namespaced:
+#
+# kubectl auth can-i list pods --as=viewer-user --as-group=viewers -n dev
+#
+# Resultado esperado: no (ClusterRole 'node-reader' nao tem permissao em pods)
+#
+# Ver detalhes:
+#
+# kubectl describe clusterrolebinding viewer-binding
+# =============================================================================

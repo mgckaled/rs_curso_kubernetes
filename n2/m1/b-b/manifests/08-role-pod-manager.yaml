@@ -1,0 +1,57 @@
+# =============================================================================
+# Role - Pod Manager (Permissoes Amplas para Administrador de Namespace)
+# =============================================================================
+# Role com permissoes para gerenciar pods completamente em um namespace.
+# Demonstra role com multiplos verbs incluindo create, update, delete.
+#
+# Cenario: admin do namespace dev pode gerenciar pods
+# =============================================================================
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+
+metadata:
+  name: pod-manager
+  namespace: dev
+  labels:
+    purpose: rbac-demo
+    access-type: admin
+
+spec:
+  rules:
+    # Gerenciar pods
+    - apiGroups: [""]
+      resources:
+        - pods
+        - pods/log
+        - pods/status
+      verbs:
+        - get
+        - list
+        - watch
+        - create
+        - update
+        - patch
+        - delete
+
+    # Gerenciar deployments
+    - apiGroups: ["apps"]
+      resources:
+        - deployments
+        - replicasets
+      verbs:
+        - get
+        - list
+        - watch
+        - create
+        - update
+        - patch
+        - delete
+
+    # Ler ConfigMaps (sem permissao para criar/modificar)
+    - apiGroups: [""]
+      resources:
+        - configmaps
+      verbs:
+        - get
+        - list

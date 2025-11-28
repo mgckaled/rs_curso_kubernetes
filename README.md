@@ -13,8 +13,8 @@ Repositório pessoal de registro, referência e suporte para fins de aprendizado
 | | | **C** | [Probes e Self Healing](./n1/m2/b-c/) | [Ver](./.github/docs/content/resumes/n1/m2/r_m2_b-c.md) | 8 | [10](./.github/docs/content/assessments/n1/m2/q_m2_b-c.md) |
 | | | **D** | [Entendendo mais sobre Volumes](./n1/m2/b-d/) | [Ver](./.github/docs/content/resumes/n1/m2/r_m2_b-d.md) | 8 | [10](./.github/docs/content/assessments/n1/m2/q_m2_b-d.md) |
 | | **-** | **-** | **Avaliação de Nível 1** | **-** | **-** | [**15**](./.github/docs/content/assessments/n1/q_n1.md) |
-| **N2** | **M1** | **A** | Kubernetes Gerenciado | [Ver](./.github/docs/content/resumes/n2/m1/r_m1_b-a.md) | 15 | - |
-| | | **B** | Conhecendo o RBAC | [Ver](./.github/docs/content/resumes/n2/m1/r_m1_b-b.md) | 13 | - |
+| **N2** | **M1** | **A** | [Kubernetes Gerenciado](./n2/m1/b-a/) | [Ver](./.github/docs/content/resumes/n2/m1/r_m1_b-a.md) | 15 | - |
+| | | **B** | [Conhecendo o RBAC](./n2/m1/b-b/) | [Ver](./.github/docs/content/resumes/n2/m1/r_m1_b-b.md) | 13 | - |
 | | **-** | **-** | **Avaliação do Módulo 1** | **-** | **-** | [**20**](./.github/docs/content/assessments/n2/m1/q_m1.md) |
 | | **M2** | **A** | StatefulSet e DaemonSet | [Ver](./.github/docs/content/resumes/n2/m2/r_m2_b-a.md) | 19 | 10 |
 | | | **B** | Adaptando nosso Pipeline | [Ver](./.github/docs/content/resumes/n2/m2/r_m2_b-b.md) | 9 | 10 |
@@ -114,4 +114,11 @@ Simulação de ambiente Kubernetes gerenciado (como DigitalOcean DOKS e AWS EKS)
 - **Projeto:** [`n2/m1/b-a/`](./n2/m1/b-a/)
 - **Conteúdo:** Cluster Kind multi-node, MetalLB, Service LoadBalancer, Ingress Controller, Prometheus/Grafana
 - **Resumo Aulas**: [Acesso](./.github/docs/content/resumes/n2/m1/r_m1_b-a.md)
-- **Avaliação:** Questionário (pendente)
+
+#### Bloco B - Conhecendo o RBAC (Role-Based Access Control)
+
+Implementação prática de RBAC (controle de acesso baseado em funções) no Kubernetes usando Kind localmente, com custo zero. Demonstração de Roles, ClusterRoles, RoleBindings, ClusterRoleBindings e ServiceAccounts para controlar quem pode fazer o que no cluster. Aplicação do princípio de privilégio mínimo e testes de permissões com kubectl auth can-i.
+
+- **Projeto:** [`n2/m1/b-b/`](./n2/m1/b-b/)
+- **Conteúdo:** Roles, ClusterRoles, RoleBindings, ClusterRoleBindings, ServiceAccounts, kubectl auth can-i
+- **Resumo Aulas**: [Acesso](./.github/docs/content/resumes/n2/m1/r_m1_b-b.md)

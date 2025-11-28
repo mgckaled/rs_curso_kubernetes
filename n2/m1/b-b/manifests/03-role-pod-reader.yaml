@@ -1,0 +1,140 @@
+# =============================================================================
+# Role - Permissoes em um Namespace Especifico
+# =============================================================================
+# Role define um conjunto de permissoes dentro de um namespace.
+# Nao pode conceder permissoes fora do namespace ou em recursos cluster-scoped.
+#
+# QUANDO USAR ROLE:
+# - Permissoes limitadas a um namespace
+# - Acesso a recursos namespacados (pods, services, secrets, etc)
+# - Segmentar acesso por ambiente (dev, staging, prod)
+#
+# ROLE vs CLUSTERROLE:
+# - Role: namespace-scoped (usa RoleBinding)
+# - ClusterRole: cluster-scoped ou reutilizavel (usa ClusterRoleBinding ou RoleBinding)
+#
+# Cenario: Role que permite APENAS ler pods no namespace dev
+# =============================================================================
+
+# Versao da API RBAC
+apiVersion: rbac.authorization.k8s.io/v1
+
+# Tipo do recurso
+kind: Role
+
+# Metadados
+metadata:
+  # Nome da Role
+  name: pod-reader
+  # Namespace onde a Role se aplica
+  namespace: dev
+  # Labels
+  labels:
+    purpose: rbac-demo
+    access-type: read-only
+
+# Especificacao das Permissoes
+spec:
+  # ================================================================
+  # RULES - Regras de Permissao
+  # ================================================================
+  # Cada regra define:
+  # - apiGroups: grupo de API dos recursos
+  # - resources: tipos de recursos
+  # - verbs: acoes permitidas
+  # - resourceNames (opcional): recursos especificos
+  rules:
+    # ================================================================
+    # Regra 1: Ler Pods
+    # ================================================================
+    - apiGroups:
+        # "" = core API group (pods, services, configmaps, etc)
+        - ""
+      # Recursos aos quais a permissao se aplica
+      resources:
+        # Tipo de recurso: pods
+        - pods
+        # Tambem permite ler logs de pods
+        - pods/log
+      # Acoes permitidas (verbos)
+      verbs:
+        # get: ler um pod especifico
+        # Exemplo: kubectl get pod my-pod
+        - get
+        # list: listar todos os pods
+        # Exemplo: kubectl get pods
+        - list
+        # watch: monitorar mudancas em tempo real
+        # Exemplo: kubectl get pods -w
+        - watch
+
+      # ================================================================
+      # OPCIONAL: Restringir a pods especificos
+      # ================================================================
+      # Descomente para permitir acesso apenas a pods especificos:
+      # resourceNames:
+      #   - my-specific-pod
+      #   - another-allowed-pod
+
+# =============================================================================
+# API GROUPS COMUNS
+# =============================================================================
+# ""                  = core (pods, services, configmaps, secrets, pv, pvc)
+# "apps"              = deployments, statefulsets, daemonsets, replicasets
+# "batch"             = jobs, cronjobs
+# "rbac.authorization.k8s.io" = roles, rolebindings, clusterroles
+# "networking.k8s.io" = ingresses, networkpolicies
+# "storage.k8s.io"    = storageclasses, volumeattachments
+# =============================================================================
+
+# =============================================================================
+# VERBS COMUNS
+# =============================================================================
+# get     = ler um recurso especifico
+# list    = listar recursos
+# watch   = monitorar mudancas
+# create  = criar novos recursos
+# update  = atualizar recursos existentes
+# patch   = modificar parcialmente
+# delete  = deletar recursos
+# deletecollection = deletar multiplos recursos
+# =============================================================================
+
+# =============================================================================
+# EXEMPLO: Role com Multiplas Regras
+# =============================================================================
+# rules:
+#   # Regra 1: ler pods
+#   - apiGroups: [""]
+#     resources: ["pods", "pods/log"]
+#     verbs: ["get", "list", "watch"]
+#
+#   # Regra 2: ler ConfigMaps especificos
+#   - apiGroups: [""]
+#     resources: ["configmaps"]
+#     resourceNames: ["app-config", "feature-flags"]
+#     verbs: ["get"]
+#
+#   # Regra 3: ler Deployments
+#   - apiGroups: ["apps"]
+#     resources: ["deployments"]
+#     verbs: ["get", "list"]
+# =============================================================================
+
+# =============================================================================
+# TESTANDO ESTA ROLE
+# =============================================================================
+# Apos criar RoleBinding (proximo passo), testar com:
+#
+# kubectl auth can-i list pods \
+#   --as=system:serviceaccount:dev:app-reader \
+#   --namespace=dev
+#
+# Resultado esperado: yes
+#
+# kubectl auth can-i create pods \
+#   --as=system:serviceaccount:dev:app-reader \
+#   --namespace=dev
+#
+# Resultado esperado: no (create nao esta nos verbs)
+# =============================================================================

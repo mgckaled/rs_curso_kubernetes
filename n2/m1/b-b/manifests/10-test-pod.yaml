@@ -1,0 +1,34 @@
+# =============================================================================
+# Pod de Teste para RBAC
+# =============================================================================
+# Pod simples para testar permissoes RBAC de dentro do cluster.
+# Usa ServiceAccount default (sem permissoes customizadas).
+# =============================================================================
+
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: test-rbac
+  namespace: dev
+  labels:
+    purpose: rbac-test
+
+spec:
+  # Usa ServiceAccount default (sem permissoes)
+  serviceAccountName: default
+
+  containers:
+    - name: kubectl
+      image: bitnami/kubectl:latest
+      command: ["sleep", "3600"]
+
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "64Mi"
+        limits:
+          cpu: "100m"
+          memory: "128Mi"
+
+  restartPolicy: Never

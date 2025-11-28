@@ -1,0 +1,33 @@
+# =============================================================================
+# Namespace - Isolamento Logico
+# =============================================================================
+# Namespaces fornecem isolamento logico de recursos no cluster.
+# Em ambientes cloud, e comum ter namespaces separados por:
+# - Ambiente (dev, staging, prod)
+# - Equipe (team-a, team-b)
+# - Aplicacao (app-1, app-2)
+#
+# Aqui usamos "demo-cloud" para simular um namespace de aplicacao em cloud.
+# =============================================================================
+
+# Versao da API
+apiVersion: v1
+
+# Tipo do recurso
+kind: Namespace
+
+# Metadados
+metadata:
+  # Nome do namespace
+  name: demo-cloud
+
+  # Labels para organizacao
+  labels:
+    # Identificacao da aplicacao
+    app: demo-api
+    # Ambiente (dev, staging, prod)
+    environment: development
+    # Responsavel/Equipe
+    team: platform
+    # Proposito
+    purpose: cloud-simulation

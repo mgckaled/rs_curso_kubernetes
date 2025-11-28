@@ -100,3 +100,18 @@ Armazenamento persistente com StorageClass, PersistentVolume e PersistentVolumeC
 - **Conteúdo:** StorageClass, PV, PVC, hostPath, emptyDir, volume mounts
 - **Resumo Aulas**: [Acesso](./.github/docs/content/resumes/n1/m2/r_m2_b-d.md)
 - **Avaliação:** [Questionário](./.github/docs/content/assessments/n1/m2/q_m2_b-d.md) (10 questões)
+
+---
+
+## Nível 2 - Cloud e Persistência
+
+### Módulo 1 - Kubernetes Gerenciado e RBAC
+
+#### Bloco A - Kubernetes Gerenciado (Simulação Local)
+
+Simulação de ambiente Kubernetes gerenciado (como DigitalOcean DOKS e AWS EKS) usando Kind localmente, com custo zero. Implementação de MetalLB para simular Load Balancers externos, Nginx Ingress Controller para roteamento HTTP inteligente, e stack completo de monitoramento com Prometheus e Grafana.
+
+- **Projeto:** [`n2/m1/b-a/`](./n2/m1/b-a/)
+- **Conteúdo:** Cluster Kind multi-node, MetalLB, Service LoadBalancer, Ingress Controller, Prometheus/Grafana
+- **Resumo Aulas**: [Acesso](./.github/docs/content/resumes/n2/m1/r_m1_b-a.md)
+- **Avaliação:** Questionário (pendente)

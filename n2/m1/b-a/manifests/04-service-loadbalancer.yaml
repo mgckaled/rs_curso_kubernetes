@@ -1,0 +1,135 @@
+# =============================================================================
+# Service LoadBalancer - Acesso Externo via Load Balancer
+# =============================================================================
+# Service tipo LoadBalancer expoe a aplicacao EXTERNAMENTE.
+#
+# EM CLOUD GERENCIADA:
+# - AWS EKS: provisiona AWS Elastic Load Balancer (ELB/NLB)
+# - DigitalOcean: provisiona DigitalOcean Load Balancer
+# - GCP GKE: provisiona Google Cloud Load Balancer
+# - Custo: ~$10-15/mes por Load Balancer
+#
+# NO KIND (LOCAL):
+# - Requer MetalLB instalado
+# - MetalLB atribui IP do pool configurado
+# - Simula comportamento de cloud sem custo
+# =============================================================================
+
+# Versao da API
+apiVersion: v1
+
+# Tipo do recurso
+kind: Service
+
+# Metadados
+metadata:
+  # Nome do service
+  name: demo-api-lb
+  # Namespace
+  namespace: demo-cloud
+  # Labels
+  labels:
+    app.kubernetes.io/name: demo-api
+    app.kubernetes.io/component: api
+    service-type: loadbalancer
+  # ================================================================
+  # ANNOTATIONS - Configuracoes especificas do provedor
+  # ================================================================
+  # Em cloud, annotations controlam comportamento do LB:
+  annotations:
+    # AWS EKS: tipo de Load Balancer (classic, nlb, alb)
+    # service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+
+    # AWS EKS: esquema (internal ou internet-facing)
+    # service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+
+    # DigitalOcean: habilitar proxy protocol
+    # service.beta.kubernetes.io/do-loadbalancer-enable-proxy-protocol: "true"
+
+    # DigitalOcean: algoritmo de balanceamento
+    # service.beta.kubernetes.io/do-loadbalancer-algorithm: "round_robin"
+
+    # MetalLB: compartilhar IP entre services (opcional)
+    # metallb.universe.tf/allow-shared-ip: "demo-api-shared"
+
+# Especificacao do Service
+spec:
+  # ================================================================
+  # TIPO: LoadBalancer
+  # ================================================================
+  # - Provisiona Load Balancer externo (cloud) ou MetalLB (local)
+  # - Permite acesso de fora do cluster
+  # - CUSTO: cada LB custa dinheiro em cloud
+  type: LoadBalancer
+
+  # ================================================================
+  # EXTERNAL TRAFFIC POLICY
+  # ================================================================
+  # Cluster (padrao): trafego pode ser roteado para qualquer node
+  #   - Pro: distribui carga melhor
+  #   - Contra: pode ter hop extra (custo de latencia/rede)
+  #   - Contra: perde IP original do cliente (ve IP do node)
+  #
+  # Local: trafego vai apenas para node que tem o pod
+  #   - Pro: preserva IP do cliente
+  #   - Pro: sem hop extra
+  #   - Contra: distribuicao desigual se pods nao estao em todos nodes
+  externalTrafficPolicy: Local
+
+  # ================================================================
+  # SELECTOR - Direciona trafego para pods
+  # ================================================================
+  selector:
+    app.kubernetes.io/name: demo-api
+
+  # ================================================================
+  # PORTS - Mapeamento de portas
+  # ================================================================
+  ports:
+    - name: http
+      protocol: TCP
+      # Porta exposta pelo Load Balancer
+      port: 3000
+      # Porta do container
+      targetPort: http
+      # NodePort (opcional): porta nos nodes
+      # Se omitido, Kubernetes escolhe automaticamente entre 30000-32767
+      # nodePort: 30080
+
+  # ================================================================
+  # SESSION AFFINITY
+  # ================================================================
+  # ClientIP: mesmo cliente sempre para o mesmo pod
+  # Util para aplicacoes com sessao
+  sessionAffinity: None
+
+# =============================================================================
+# IMPORTANTE: CUSTO EM CLOUD
+# =============================================================================
+# Cada Service LoadBalancer cria um LB separado:
+# - AWS NLB: ~$16/mes + $0.006/GB processado
+# - AWS ALB: ~$22/mes + $0.008/LCU-hora
+# - DigitalOcean LB: ~$12/mes
+#
+# Alternativa economica: usar 1 unico Ingress Controller
+# - 1 LoadBalancer para o Ingress
+# - Multiplas apps via Ingress (roteamento HTTP)
+# - Economia: $12 vs $12 x N apps
+# =============================================================================
+
+# =============================================================================
+# COMO TESTAR ESTE SERVICE
+# =============================================================================
+# 1. Aguardar IP externo ser atribuido:
+#    kubectl get svc demo-api-lb -n demo-cloud -w
+#
+# 2. Quando EXTERNAL-IP aparecer (ex: 172.18.255.200):
+#    curl http://172.18.255.200:3000/health
+#
+# 3. Testar outros endpoints:
+#    curl http://172.18.255.200:3000/
+#    curl http://172.18.255.200:3000/stress/cpu?duration=5
+#
+# 4. Ver metricas Prometheus:
+#    curl http://172.18.255.200:3000/metrics
+# =============================================================================

@@ -1,0 +1,73 @@
+# =============================================================================
+# Configuracao do Cluster Kind - Simulacao de Ambiente Cloud
+# =============================================================================
+# Este cluster simula um ambiente de Kubernetes gerenciado (cloud) com:
+# - 1 Control Plane node (gerenciado, como DOKS/EKS)
+# - 3 Worker nodes (onde os workloads rodam)
+# - Porta 80 e 443 expostas para Ingress Controller
+# - Networking configurado para MetalLB
+# =============================================================================
+
+# Versao da API do Kind
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+
+# Nome do cluster (opcional, pode ser definido via CLI)
+name: cloud-sim
+
+# Configuracao de nodes
+nodes:
+  # Control Plane Node
+  # Em clouds gerenciadas, este node e invisivel/gerenciado
+  # Aqui, o Kind gerencia automaticamente
+  - role: control-plane
+    # Mapeamento de portas para host
+    # Necessario para acessar Ingress Controller
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            # Permite que pods usem mais CPU se disponivel
+            cpu-manager-policy: none
+    # Expor portas 80 e 443 para Ingress
+    extraPortMappings:
+      # Porta 80 (HTTP)
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      # Porta 443 (HTTPS)
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
+
+  # Worker Node 1
+  # Simula um node em um Node Group/Node Pool
+  - role: worker
+    # Labels customizadas para demonstrar node selectors
+    labels:
+      node-type: general
+      workload: api
+
+  # Worker Node 2
+  # Simula escala horizontal de workers
+  - role: worker
+    labels:
+      node-type: general
+      workload: api
+
+  # Worker Node 3
+  # Demonstra alta disponibilidade com multiplos workers
+  - role: worker
+    labels:
+      node-type: general
+      workload: monitoring
+
+# Configuracoes de rede
+# Necessario para MetalLB funcionar corretamente
+networking:
+  # Desabilita default CNI para permitir MetalLB
+  disableDefaultCNI: false
+  # Configuracao de pods e services CIDR
+  podSubnet: "10.244.0.0/16"
+  serviceSubnet: "10.96.0.0/12"

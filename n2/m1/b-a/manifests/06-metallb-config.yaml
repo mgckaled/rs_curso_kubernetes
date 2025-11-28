@@ -1,0 +1,166 @@
+# =============================================================================
+# MetalLB Configuration - Simulacao de Load Balancer em Ambiente Local
+# =============================================================================
+# MetalLB e uma implementacao de Load Balancer para clusters bare-metal e locais.
+# Em clouds gerenciadas (AWS, DO, GCP), Load Balancers sao provisionados
+# automaticamente. No Kind, usamos MetalLB para simular esse comportamento.
+#
+# COMPONENTES DO MetalLB:
+# - IPAddressPool: define range de IPs que podem ser atribuidos
+# - L2Advertisement: anuncia IPs via protocolo ARP (Layer 2)
+#
+# IMPORTANTE: O range de IPs deve estar na mesma rede do Docker Kind
+# =============================================================================
+
+---
+# =============================================================================
+# IPAddressPool - Pool de IPs Disponiveis
+# =============================================================================
+# Define o range de IPs que o MetalLB pode atribuir para Services LoadBalancer
+#
+# COMO DESCOBRIR O RANGE CORRETO:
+# 1. Inspecionar rede do Kind:
+#    docker network inspect -f '{{.IPAM.Config}}' kind
+#
+# 2. Saida exemplo:
+#    [{172.18.0.0/16  172.18.0.1 map[]}]
+#    Rede: 172.18.0.0/16
+#    Gateway: 172.18.0.1
+#
+# 3. Escolher range no final da subnet (evitar conflitos):
+#    172.18.255.200-172.18.255.250 (51 IPs disponiveis)
+# =============================================================================
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+
+metadata:
+  # Nome do pool
+  name: kind-pool
+  # Namespace onde MetalLB esta instalado
+  namespace: metallb-system
+
+spec:
+  # ================================================================
+  # ADDRESSES - Range de IPs
+  # ================================================================
+  # Formato: CIDR ou range (inicio-fim)
+  # Exemplos:
+  # - CIDR: 172.18.255.0/24 (256 IPs)
+  # - Range: 172.18.255.200-172.18.255.250 (51 IPs)
+  addresses:
+    # Range de IPs para Services LoadBalancer
+    # Ajuste conforme sua rede Docker Kind
+    - 172.18.255.200-172.18.255.250
+
+  # ================================================================
+  # AUTO ASSIGN - Atribuicao Automatica
+  # ================================================================
+  # true: MetalLB atribui IP automaticamente para novos Services LB
+  # false: requer annotation no Service para especificar pool
+  autoAssign: true
+
+---
+# =============================================================================
+# L2Advertisement - Anuncio de IPs via Layer 2 (ARP)
+# =============================================================================
+# Anuncia os IPs do pool na rede local usando protocolo ARP.
+# Quando um Service LoadBalancer e criado:
+# 1. MetalLB pega um IP do pool
+# 2. L2Advertisement anuncia esse IP via ARP
+# 3. Rede local roteia trafego para o node que tem o pod
+#
+# MODO L2 vs BGP:
+# - L2 (usado aqui): simples, funciona em qualquer rede, nao requer config de router
+# - BGP: mais complexo, requer BGP router, melhor para producao bare-metal
+# =============================================================================
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+
+metadata:
+  # Nome do advertisement
+  name: kind-l2-advert
+  # Namespace
+  namespace: metallb-system
+
+spec:
+  # ================================================================
+  # IP ADDRESS POOLS - Pools a serem anunciados
+  # ================================================================
+  # Lista de pools que este advertisement deve anunciar
+  # Se omitido: anuncia todos os pools
+  ipAddressPools:
+    - kind-pool
+
+  # ================================================================
+  # NODE SELECTORS - Nodes que anunciam IPs (opcional)
+  # ================================================================
+  # Por padrao, todos os nodes podem anunciar
+  # Use para restringir a nodes especificos
+  # nodeSelectors:
+  #   - matchLabels:
+  #       kubernetes.io/hostname: kind-worker
+
+# =============================================================================
+# COMO VERIFICAR SE MetalLB ESTA FUNCIONANDO
+# =============================================================================
+# 1. Verificar pods do MetalLB:
+#    kubectl get pods -n metallb-system
+#
+# 2. Ver logs do controller:
+#    kubectl logs -n metallb-system -l app=metallb,component=controller
+#
+# 3. Ver logs do speaker:
+#    kubectl logs -n metallb-system -l app=metallb,component=speaker
+#
+# 4. Verificar IPAddressPool:
+#    kubectl get ipaddresspool -n metallb-system
+#    kubectl describe ipaddresspool kind-pool -n metallb-system
+#
+# 5. Verificar L2Advertisement:
+#    kubectl get l2advertisement -n metallb-system
+#    kubectl describe l2advertisement kind-l2-advert -n metallb-system
+#
+# 6. Criar um Service LoadBalancer de teste:
+#    kubectl create deployment nginx --image=nginx
+#    kubectl expose deployment nginx --type=LoadBalancer --port=80
+#    kubectl get svc nginx -w
+#    # Aguardar EXTERNAL-IP ser atribuido
+#    curl http://<EXTERNAL-IP>
+# =============================================================================
+
+# =============================================================================
+# TROUBLESHOOTING
+# =============================================================================
+# PROBLEMA: EXTERNAL-IP fica em <pending>
+#
+# CAUSAS POSSIVEIS:
+# 1. MetalLB nao esta instalado
+#    Solucao: kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.9/config/manifests/metallb-native.yaml
+#
+# 2. IPAddressPool ou L2Advertisement nao foram criados
+#    Solucao: kubectl apply -f 06-metallb-config.yaml
+#
+# 3. Range de IPs incorreto (fora da rede Docker)
+#    Solucao: Verificar com `docker network inspect kind` e ajustar addresses
+#
+# 4. Conflito de IPs (IP ja em uso)
+#    Solucao: Escolher range diferente
+#
+# 5. Pods do MetalLB nao estao rodando
+#    Solucao: kubectl get pods -n metallb-system
+#             kubectl logs -n metallb-system <pod-name>
+# =============================================================================
+
+# =============================================================================
+# DIFERENCA: MetalLB vs Cloud Load Balancer
+# =============================================================================
+# | Aspecto            | MetalLB (Local)        | Cloud LB (AWS/DO/GCP)     |
+# |--------------------|------------------------|---------------------------|
+# | Provisionamento    | Instantaneo            | 30s - 2min                |
+# | IP Source          | Pool local configurado | IP publico do provedor    |
+# | Custo              | Gratuito               | ~$12-15/mes por LB        |
+# | Alta Disponibilidade | Limitada (L2)        | Multi-AZ, auto-healing    |
+# | Health Checks      | Basicos                | Avancados (7-layer)       |
+# | SSL/TLS Termination| Nao (usar Ingress)    | Sim (ALB, GCLB)           |
+# | DDoS Protection    | Nao                    | Sim (CloudFlare, AWS Shield) |
+# =============================================================================

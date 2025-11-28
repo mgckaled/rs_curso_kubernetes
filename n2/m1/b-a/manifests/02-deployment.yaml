@@ -1,0 +1,164 @@
+# =============================================================================
+# Deployment - Demo API em Ambiente Cloud Simulado
+# =============================================================================
+# Este Deployment configura a demo-api para rodar em um ambiente que simula
+# cloud gerenciada, com:
+# - Multiplas replicas para alta disponibilidade
+# - Resource requests/limits definidos (importante em cloud para custo)
+# - Node selector para direcionar para workers especificos
+# - Probes configuradas para health check
+# - ConfigMap/Secret para configuracao (serao criados separadamente se necessario)
+# =============================================================================
+
+# Versao da API
+apiVersion: apps/v1
+
+# Tipo do recurso
+kind: Deployment
+
+# Metadados
+metadata:
+  # Nome do deployment
+  name: demo-api
+  # Namespace onde sera criado
+  namespace: demo-cloud
+  # Labels para organizacao
+  labels:
+    app.kubernetes.io/name: demo-api
+    app.kubernetes.io/component: api
+    app.kubernetes.io/version: "1.0.0"
+    environment: development
+
+# Especificacao do Deployment
+spec:
+  # Numero de replicas
+  # Em cloud: ajustar baseado em carga e custo
+  # 3 replicas = alta disponibilidade basica
+  replicas: 3
+
+  # Estrategia de atualizacao
+  # RollingUpdate garante zero downtime
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # Maximo de pods acima do desejado durante update
+      maxSurge: 1
+      # Maximo de pods indisponiveis durante update
+      maxUnavailable: 0
+
+  # Seletor de pods
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demo-api
+
+  # Template do Pod
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demo-api
+        app.kubernetes.io/component: api
+        app.kubernetes.io/version: "1.0.0"
+
+    spec:
+      # ================================================================
+      # NODE SELECTOR - Direciona pods para workers especificos
+      # ================================================================
+      # Em cloud: usado para direcionar para node groups especificos
+      # (ex: nodes com GPU, SSD, ou em zonas especificas)
+      nodeSelector:
+        workload: api
+
+      # ================================================================
+      # CONTAINERS
+      # ================================================================
+      containers:
+        - name: demo-api
+          # Imagem local (carregada no Kind)
+          image: demo-api:v1
+          # Never: usa imagem local do Kind
+          # Em cloud: Always ou IfNotPresent com registry real
+          imagePullPolicy: Never
+
+          # Porta do container
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          # Variáveis de ambiente
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3000"
+            # Em cloud: usar ConfigMap e Secret
+            # - name: DATABASE_URL
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: demo-api-secret
+            #       key: database-url
+
+          # ================================================================
+          # HEALTH CHECKS - Essenciais em Cloud
+          # ================================================================
+
+          # Startup Probe: verifica se app inicializou
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            # 30 tentativas x 10s = 5 minutos para iniciar
+            failureThreshold: 30
+            periodSeconds: 10
+
+          # Readiness Probe: verifica se pode receber trafego
+          # Se falhar: removido do Service (load balancer para de enviar trafego)
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # Liveness Probe: verifica se esta saudavel
+          # Se falhar: container e reiniciado
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # ================================================================
+          # RESOURCES - CRITICO EM CLOUD
+          # ================================================================
+          # Em cloud: recursos = custo
+          # Requests: o que o pod PRECISA (usado para scheduling)
+          # Limits: o que o pod PODE USAR no maximo
+          #
+          # Exemplo de custo:
+          # AWS EKS: ~$0.05/hora por vCPU + $0.01/hora por GB RAM
+          # 100m CPU + 128Mi RAM = ~$0.006/hora por pod
+          # 3 replicas 24/7/30 = ~$13/mes apenas para compute
+          resources:
+            requests:
+              # 100 milicores = 0.1 CPU
+              cpu: "100m"
+              # 128 Mebibytes de RAM
+              memory: "128Mi"
+            limits:
+              # Limite de 500 milicores = 0.5 CPU
+              cpu: "500m"
+              # Limite de 512 Mebibytes de RAM
+              memory: "512Mi"
+
+      # Tempo para graceful shutdown
+      # Importante em cloud para nao perder requisicoes durante rolling update
+      terminationGracePeriodSeconds: 30
+
+      # Politica de restart
+      restartPolicy: Always

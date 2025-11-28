@@ -1,0 +1,229 @@
+# =============================================================================
+# Ingress - Roteamento HTTP/HTTPS Inteligente
+# =============================================================================
+# Ingress e um recurso de camada L7 (aplicacao) que gerencia acesso externo
+# a servicos no cluster, tipicamente HTTP/HTTPS.
+#
+# VANTAGENS vs LoadBalancer:
+# - 1 unico Load Balancer para multiplas aplicacoes
+# - Roteamento baseado em host e path
+# - Terminacao SSL/TLS centralizada
+# - Economia significativa em cloud (1 LB vs N LBs)
+#
+# CUSTO EM CLOUD:
+# - Ingress Controller: 1 LoadBalancer (~$12-15/mes)
+# - Apps adicionais: $0 (roteadas via Ingress)
+# - vs LoadBalancer por app: $12-15 x N apps
+#
+# Exemplo: 5 apps
+# - Com Ingress: $15 (1 LB)
+# - Com LoadBalancer: $75 (5 LBs)
+# =============================================================================
+
+# Versao da API
+apiVersion: networking.k8s.io/v1
+
+# Tipo do recurso
+kind: Ingress
+
+# Metadados
+metadata:
+  # Nome do Ingress
+  name: demo-api-ingress
+  # Namespace
+  namespace: demo-cloud
+  # Labels
+  labels:
+    app.kubernetes.io/name: demo-api
+    app.kubernetes.io/component: ingress
+
+  # ================================================================
+  # ANNOTATIONS - Configuracoes do Ingress Controller
+  # ================================================================
+  annotations:
+    # Classe do Ingress Controller (nginx neste caso)
+    # kubernetes.io/ingress.class: "nginx"  # Deprecated, usar spec.ingressClassName
+
+    # NGINX: habilitar CORS
+    # nginx.ingress.kubernetes.io/enable-cors: "true"
+
+    # NGINX: rewrite de URL
+    # nginx.ingress.kubernetes.io/rewrite-target: /
+
+    # NGINX: timeout de requisicao
+    # nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+
+    # NGINX: limite de taxa (rate limiting)
+    # nginx.ingress.kubernetes.io/limit-rps: "10"
+
+    # AWS ALB: esquema (internet-facing ou internal)
+    # alb.ingress.kubernetes.io/scheme: internet-facing
+
+    # AWS ALB: tipo de target (ip ou instance)
+    # alb.ingress.kubernetes.io/target-type: ip
+
+    # Cert-Manager: issuer para SSL automatico
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+# Especificacao do Ingress
+spec:
+  # ================================================================
+  # INGRESS CLASS - Define qual Ingress Controller usar
+  # ================================================================
+  # Necessario quando ha multiplos Ingress Controllers no cluster
+  # Exemplos: nginx, traefik, aws-alb, gce
+  ingressClassName: nginx
+
+  # ================================================================
+  # TLS - Configuracao de HTTPS (opcional)
+  # ================================================================
+  # Requer certificado SSL (Secret tipo tls)
+  # Em producao: usar cert-manager para Let's Encrypt automatico
+  # tls:
+  #   - hosts:
+  #       - demo-api.local
+  #       - www.demo-api.local
+  #     # Nome do Secret com certificado
+  #     secretName: demo-api-tls
+
+  # ================================================================
+  # RULES - Regras de Roteamento
+  # ================================================================
+  rules:
+    # ================================================================
+    # ROTEAMENTO BASEADO EM HOST
+    # ================================================================
+    # Requisicoes com "Host: demo-api.local" vao para este rule
+    - host: demo-api.local
+      http:
+        paths:
+          # ================================================================
+          # PATH: / (raiz)
+          # ================================================================
+          # Rota todos requests para /
+          - path: /
+            # Tipo de match:
+            # - Prefix: match de prefixo (ex: /api match /api/users)
+            # - Exact: match exato
+            # - ImplementationSpecific: depende do controller
+            pathType: Prefix
+            # Backend: para onde enviar o trafego
+            backend:
+              service:
+                # Nome do Service (ClusterIP)
+                name: demo-api-service
+                port:
+                  # Porta do Service
+                  number: 3000
+
+          # ================================================================
+          # EXEMPLO: Multiplos paths na mesma app
+          # ================================================================
+          # Util para rotear diferentes paths para diferentes backends
+          # - path: /api
+          #   pathType: Prefix
+          #   backend:
+          #     service:
+          #       name: demo-api-service
+          #       port:
+          #         number: 3000
+
+          # - path: /admin
+          #   pathType: Prefix
+          #   backend:
+          #     service:
+          #       name: admin-service
+          #       port:
+          #         number: 8080
+
+    # ================================================================
+    # EXEMPLO: Multiplos hosts (virtual hosting)
+    # ================================================================
+    # Diferentes hosts podem ir para diferentes backends
+    # - host: admin.demo-api.local
+    #   http:
+    #     paths:
+    #       - path: /
+    #         pathType: Prefix
+    #         backend:
+    #           service:
+    #             name: admin-service
+    #             port:
+    #               number: 8080
+
+    # - host: api.demo-api.local
+    #   http:
+    #     paths:
+    #       - path: /
+    #         pathType: Prefix
+    #         backend:
+    #           service:
+    #             name: demo-api-service
+    #             port:
+    #               number: 3000
+
+# =============================================================================
+# COMO FUNCIONA O ROTEAMENTO
+# =============================================================================
+# 1. Cliente faz requisicao: curl -H "Host: demo-api.local" http://INGRESS_IP/health
+# 2. Requisicao chega no Ingress Controller (LoadBalancer)
+# 3. Ingress Controller le header "Host: demo-api.local"
+# 4. Encontra regra correspondente neste Ingress
+# 5. Roteia para Service "demo-api-service" porta 3000
+# 6. Service distribui para pods via ClusterIP
+# 7. Resposta retorna pelo mesmo caminho
+# =============================================================================
+
+# =============================================================================
+# COMO TESTAR ESTE INGRESS
+# =============================================================================
+# 1. Obter IP do Ingress Controller:
+#    INGRESS_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+#    echo $INGRESS_IP
+#
+# 2. Testar com header Host:
+#    curl -H "Host: demo-api.local" http://$INGRESS_IP/health
+#    curl -H "Host: demo-api.local" http://$INGRESS_IP/
+#
+# 3. Adicionar ao /etc/hosts (Linux/Mac) ou C:\Windows\System32\drivers\etc\hosts (Windows):
+#    172.18.255.201  demo-api.local
+#
+# 4. Testar diretamente no navegador ou curl:
+#    curl http://demo-api.local/health
+#    curl http://demo-api.local/metrics
+#
+# 5. Ver detalhes do Ingress:
+#    kubectl describe ingress demo-api-ingress -n demo-cloud
+# =============================================================================
+
+# =============================================================================
+# PRODUCAO: Configuracao com SSL/TLS
+# =============================================================================
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: demo-api-ingress-tls
+#   namespace: demo-cloud
+#   annotations:
+#     # Cert-Manager: emite certificado Let's Encrypt automaticamente
+#     cert-manager.io/cluster-issuer: "letsencrypt-prod"
+#     # Redireciona HTTP para HTTPS
+#     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+# spec:
+#   ingressClassName: nginx
+#   tls:
+#     - hosts:
+#         - demo-api.example.com
+#       secretName: demo-api-tls  # Certificado criado pelo cert-manager
+#   rules:
+#     - host: demo-api.example.com
+#       http:
+#         paths:
+#           - path: /
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: demo-api-service
+#                 port:
+#                   number: 3000
+# =============================================================================

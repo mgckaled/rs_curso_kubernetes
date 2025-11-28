@@ -1,0 +1,221 @@
+# =============================================================================
+# Kube-Prometheus-Stack - Configuracao Customizada
+# =============================================================================
+# Este arquivo contem configuracoes para instalacao do kube-prometheus-stack
+# via Helm. O stack inclui:
+# - Prometheus: coleta e armazena metricas
+# - Grafana: visualizacao de dashboards
+# - AlertManager: gerenciamento de alertas
+# - Node Exporter: metricas dos nodes
+# - Kube-State-Metrics: metricas dos recursos K8s
+#
+# USO:
+# helm install kube-prometheus prometheus-community/kube-prometheus-stack \
+#   --namespace monitoring \
+#   --create-namespace \
+#   --values values-prometheus.yaml
+# =============================================================================
+
+# =============================================================================
+# PROMETHEUS - Servidor de Metricas
+# =============================================================================
+prometheus:
+  prometheusSpec:
+    # Retencao de dados (quanto tempo manter metricas)
+    retention: 7d
+
+    # Recursos do Prometheus
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 2Gi
+
+    # Storage para metricas (opcional)
+    # Em producao: usar PersistentVolume
+    # storageSpec:
+    #   volumeClaimTemplate:
+    #     spec:
+    #       accessModes: ["ReadWriteOnce"]
+    #       resources:
+    #         requests:
+    #           storage: 10Gi
+
+    # Service Monitors adicionais
+    # Automaticamente descobre Services com label prometheus: "true"
+    serviceMonitorSelectorNilUsesHelmValues: false
+
+    # Pod Monitors
+    podMonitorSelectorNilUsesHelmValues: false
+
+# =============================================================================
+# GRAFANA - Dashboards e Visualizacao
+# =============================================================================
+grafana:
+  # Habilitar Grafana
+  enabled: true
+
+  # Senha do admin
+  adminPassword: prom-operator
+
+  # Dashboards pre-configurados
+  defaultDashboardsEnabled: true
+
+  # Dashboards customizados adicionais
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+
+  # Recursos do Grafana
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  # Datasources (Prometheus ja e configurado automaticamente)
+  # Pode adicionar outros datasources aqui
+
+  # Service do Grafana
+  service:
+    type: ClusterIP
+    port: 80
+
+# =============================================================================
+# ALERTMANAGER - Gerenciamento de Alertas
+# =============================================================================
+alertmanager:
+  # Habilitar AlertManager
+  enabled: true
+
+  alertmanagerSpec:
+    # Recursos
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+# =============================================================================
+# NODE EXPORTER - Metricas dos Nodes
+# =============================================================================
+nodeExporter:
+  # Habilitar Node Exporter
+  enabled: true
+
+  # Recursos
+  resources:
+    requests:
+      cpu: 50m
+      memory: 30Mi
+    limits:
+      cpu: 100m
+      memory: 50Mi
+
+# =============================================================================
+# KUBE-STATE-METRICS - Metricas dos Recursos K8s
+# =============================================================================
+kube-state-metrics:
+  # Habilitar Kube-State-Metrics
+  enabled: true
+
+  # Recursos
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# =============================================================================
+# PROMETHEUS OPERATOR - Gerencia CRDs do Prometheus
+# =============================================================================
+prometheusOperator:
+  # Recursos do Operator
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# =============================================================================
+# KUBELETS - Metricas do Kubelet
+# =============================================================================
+kubelet:
+  enabled: true
+
+# =============================================================================
+# CORE DNS - Metricas do CoreDNS
+# =============================================================================
+coreDns:
+  enabled: true
+
+# =============================================================================
+# KUBE API SERVER - Metricas do API Server
+# =============================================================================
+kubeApiServer:
+  enabled: true
+
+# =============================================================================
+# KUBE CONTROLLER MANAGER - Metricas do Controller Manager
+# =============================================================================
+kubeControllerManager:
+  enabled: true
+
+# =============================================================================
+# KUBE SCHEDULER - Metricas do Scheduler
+# =============================================================================
+kubeScheduler:
+  enabled: true
+
+# =============================================================================
+# KUBE PROXY - Metricas do Kube-Proxy
+# =============================================================================
+kubeProxy:
+  enabled: true
+
+# =============================================================================
+# NOTAS DE USO
+# =============================================================================
+# 1. Instalar:
+#    helm install kube-prometheus prometheus-community/kube-prometheus-stack \
+#      --namespace monitoring \
+#      --create-namespace \
+#      --values values-prometheus.yaml
+#
+# 2. Acessar Grafana:
+#    kubectl port-forward -n monitoring svc/kube-prometheus-grafana 3001:80
+#    URL: http://localhost:3001
+#    Usuario: admin
+#    Senha: prom-operator
+#
+# 3. Acessar Prometheus:
+#    kubectl port-forward -n monitoring svc/kube-prometheus-kube-prome-prometheus 9090:9090
+#    URL: http://localhost:9090
+#
+# 4. Acessar AlertManager:
+#    kubectl port-forward -n monitoring svc/kube-prometheus-kube-prome-alertmanager 9093:9093
+#    URL: http://localhost:9093
+#
+# 5. Desinstalar:
+#    helm uninstall kube-prometheus -n monitoring
+#    kubectl delete namespace monitoring
+# =============================================================================

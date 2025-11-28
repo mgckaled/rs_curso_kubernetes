@@ -1,0 +1,84 @@
+# =============================================================================
+# Service ClusterIP - Acesso Interno ao Cluster
+# =============================================================================
+# Service tipo ClusterIP expoe a aplicacao APENAS internamente no cluster.
+# Pods de outros namespaces podem acessar via DNS:
+# - No mesmo namespace: http://demo-api-service:3000
+# - De outro namespace: http://demo-api-service.demo-cloud.svc.cluster.local:3000
+#
+# Uso tipico em cloud:
+# - Servicos internos (databases, caches, APIs privadas)
+# - Comunicacao pod-to-pod
+# - Servicos que ficam atras de Ingress
+# =============================================================================
+
+# Versao da API
+apiVersion: v1
+
+# Tipo do recurso
+kind: Service
+
+# Metadados
+metadata:
+  # Nome do service
+  name: demo-api-service
+  # Namespace
+  namespace: demo-cloud
+  # Labels
+  labels:
+    app.kubernetes.io/name: demo-api
+    app.kubernetes.io/component: api
+    service-type: internal
+
+# Especificacao do Service
+spec:
+  # ================================================================
+  # TIPO: ClusterIP (padrao)
+  # ================================================================
+  # - Acessivel APENAS dentro do cluster
+  # - Nao consome recursos externos (sem custo adicional em cloud)
+  # - Usado para servicos internos ou atras de Ingress
+  type: ClusterIP
+
+  # ================================================================
+  # SELECTOR - Direciona trafego para pods
+  # ================================================================
+  # Pods com estas labels receberao trafego
+  selector:
+    app.kubernetes.io/name: demo-api
+
+  # ================================================================
+  # PORTS - Mapeamento de portas
+  # ================================================================
+  ports:
+    # Nome da porta (util para Services com multiplas portas)
+    - name: http
+      # Protocolo
+      protocol: TCP
+      # Porta do Service (outros pods usam esta porta)
+      port: 3000
+      # Porta do container (onde a app escuta)
+      targetPort: http
+
+  # ================================================================
+  # SESSION AFFINITY - Persistencia de sessao
+  # ================================================================
+  # None: requisicoes sao distribuidas entre pods (padrao)
+  # ClientIP: mesmo cliente sempre vai para o mesmo pod
+  # Util para: aplicacoes com sessao em memoria (nao recomendado em cloud)
+  sessionAffinity: None
+
+# =============================================================================
+# COMO TESTAR ESTE SERVICE
+# =============================================================================
+# 1. De dentro de um pod no mesmo namespace:
+#    kubectl run curl-test --image=curlimages/curl:latest --rm -it --restart=Never -n demo-cloud -- \
+#      curl http://demo-api-service:3000/health
+#
+# 2. De um pod em outro namespace:
+#    kubectl run curl-test --image=curlimages/curl:latest --rm -it --restart=Never -n default -- \
+#      curl http://demo-api-service.demo-cloud.svc.cluster.local:3000/health
+#
+# 3. Ver endpoints (IPs dos pods):
+#    kubectl get endpoints demo-api-service -n demo-cloud
+# =============================================================================

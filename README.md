@@ -27,6 +27,16 @@ Repositório pessoal de registro, referência e suporte para fins de aprendizado
 
 ---
 
+## Demo API
+
+A Demo API é uma aplicação NestJS 11 com Fastify projetada especificamente para demonstrar recursos Kubernetes nos três níveis do curso. Construída com Drizzle ORM e PostgreSQL 17, oferece endpoints de stress (CPU, memória, I/O) para testes de HPA e Cluster Autoscaler, CRUD completo de usuários para demonstrações de StatefulSet e persistência de dados, probes HTTP configuráveis para self-healing, e métricas Prometheus nativas para observabilidade. A stack TypeScript-native com validação via class-validator, suporte a ConfigMap/Secret, e Docker multi-stage otimizado permite explorar desde conceitos fundamentais (Deployments, Services, Probes) até patterns avançados (RBAC, CI/CD, Karpenter) em um único projeto evolutivo.
+
+Documentação completa: [apps/demo-api/README.md](./apps/demo-api/README.md)
+
+---
+
+## Projeto
+
 ## Nível 1 - Fundamentos do Kubernetes
 
 - **Avaliação de Nível:** [Questionário](./.github/docs/content/assessments/n1/q_n1.md) (15 questões)

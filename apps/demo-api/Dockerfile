@@ -36,6 +36,12 @@ RUN pnpm install --frozen-lockfile --prod
 # Copia build do stage anterior
 COPY --from=builder /app/dist ./dist
 
+# Copia arquivos de migração do banco
+COPY --from=builder /app/drizzle ./drizzle
+COPY drizzle.config.ts ./
+COPY src/db/schema.ts ./src/db/schema.ts
+COPY src/db/migrate.ts ./src/db/migrate.ts
+
 # Cria diretório para volumes
 RUN mkdir -p /app/data
 

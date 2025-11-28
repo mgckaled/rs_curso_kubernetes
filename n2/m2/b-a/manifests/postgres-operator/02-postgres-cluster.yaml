@@ -1,0 +1,40 @@
+# PostgreSQL Cluster usando CloudNativePG Operator
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgres-cluster
+  namespace: database
+spec:
+  instances: 3  # 1 primary + 2 replicas
+
+  storage:
+    size: 1Gi
+    storageClass: standard
+
+  # Bootstrap inicial
+  bootstrap:
+    initdb:
+      database: demo_db
+      owner: demo_user
+      secret:
+        name: postgres-secret
+
+  # Recursos
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+---
+# Secret para credenciais
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: database
+type: kubernetes.io/basic-auth
+stringData:
+  username: demo_user
+  password: demo_password

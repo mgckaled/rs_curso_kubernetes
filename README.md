@@ -16,7 +16,7 @@ Repositório pessoal de registro, referência e suporte para fins de aprendizado
 | **N2** | **M1** | **A** | [Kubernetes Gerenciado](./n2/m1/b-a/) | [Ver](./.github/docs/content/resumes/n2/m1/r_m1_b-a.md) | 15 | - |
 | | | **B** | [Conhecendo o RBAC](./n2/m1/b-b/) | [Ver](./.github/docs/content/resumes/n2/m1/r_m1_b-b.md) | 13 | - |
 | | **-** | **-** | **Avaliação do Módulo 1** | **-** | **-** | [**20**](./.github/docs/content/assessments/n2/m1/q_m1.md) |
-| | **M2** | **A** | StatefulSet e DaemonSet | [Ver](./.github/docs/content/resumes/n2/m2/r_m2_b-a.md) | 19 | 10 |
+| | **M2** | **A** | [StatefulSet e DaemonSet](./n2/m2/b-a/) | [Ver](./.github/docs/content/resumes/n2/m2/r_m2_b-a.md) | 19 | 10 |
 | | | **B** | Adaptando nosso Pipeline | [Ver](./.github/docs/content/resumes/n2/m2/r_m2_b-b.md) | 9 | 10 |
 | | **-** | **-** | **Avaliação do Módulo 2** | **-** | **-** | **20** |
 | **N3** | **M1** | **-** | Explorando a Auto Escala de Nós | [Ver](./.github/docs/content/resumes/n3/m1/r_m1_b-u.md) | 9 | - |
@@ -122,3 +122,15 @@ Implementação prática de RBAC (controle de acesso baseado em funções) no Ku
 - **Projeto:** [`n2/m1/b-b/`](./n2/m1/b-b/)
 - **Conteúdo:** Roles, ClusterRoles, RoleBindings, ClusterRoleBindings, ServiceAccounts, kubectl auth can-i
 - **Resumo Aulas**: [Acesso](./.github/docs/content/resumes/n2/m1/r_m1_b-b.md)
+
+---
+
+### Módulo 2 - StatefulSets e CI/CD
+
+#### Bloco A - StatefulSet e DaemonSet
+
+Implementação de aplicações stateful no Kubernetes usando StatefulSets para PostgreSQL, explorando Headless Services, persistent storage (PVC), e PostgreSQL Operators (CloudNativePG) para automação de alta disponibilidade. Demonstração de DaemonSets com Prometheus Node Exporter para monitoramento de infraestrutura em todos os nodes. Conexão da demo-api com PostgreSQL persistente.
+
+- **Projeto:** [`n2/m2/b-a/`](./n2/m2/b-a/)
+- **Conteúdo:** StatefulSet, PostgreSQL, Headless Service, PVC, CloudNativePG Operator, DaemonSet, Node Exporter
+- **Resumo Aulas**: [Acesso](./.github/docs/content/resumes/n2/m2/r_m2_b-a.md)

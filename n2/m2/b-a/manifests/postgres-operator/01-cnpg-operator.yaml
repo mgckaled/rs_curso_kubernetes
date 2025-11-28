@@ -1,0 +1,7 @@
+# CloudNativePG Operator
+# Instalar via URL oficial (versao estavel)
+#
+# kubectl apply -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.24/releases/cnpg-1.24.1.yaml
+#
+# Este arquivo e placeholder - use comando acima para instalar
+# Ou baixe o manifest e aplique localmente

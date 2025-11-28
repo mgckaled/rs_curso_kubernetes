@@ -1,0 +1,3 @@
+# StorageClass ja existe no Kind por padrao (standard)
+# Este arquivo e apenas documentacao
+# kubectl get storageclass

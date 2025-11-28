@@ -1,0 +1,14 @@
+# Headless Service para StatefulSet
+# ClusterIP: None = headless (DNS direto para pods)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-headless
+  namespace: database
+spec:
+  clusterIP: None  # Headless
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432

@@ -1,0 +1,156 @@
+# HorizontalPodAutoscaler (HPA) - Escala automaticamente o numero de pods
+# Baseado em metricas como CPU, memoria ou metricas customizadas
+#
+# Como funciona:
+# 1. Metrics Server coleta metricas dos pods a cada 15 segundos
+# 2. HPA consulta as metricas a cada 15 segundos (configuravel)
+# 3. Calcula o numero ideal de replicas baseado nas metricas
+# 4. Ajusta o numero de replicas do Deployment
+#
+# Formula: desiredReplicas = ceil[currentReplicas * (currentMetricValue / targetMetricValue)]
+#
+# IMPORTANTE:
+# - Requer Metrics Server instalado e funcionando
+# - Deployment deve ter resource requests definidos
+# - HPA controla o campo replicas do Deployment
+#
+# Ref: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
+
+# Usamos autoscaling/v2 (versao estavel a partir do Kubernetes 1.23)
+# autoscaling/v1 suporta apenas CPU
+# autoscaling/v2 suporta CPU, memoria e metricas customizadas
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  # Nome do HPA
+  name: demo-api-hpa
+  # Namespace onde sera criado (mesmo do Deployment)
+  namespace: n3-m1-autoscale
+  labels:
+    app: demo-api
+    level: n3
+    module: m1
+spec:
+  # scaleTargetRef: referencia ao Deployment que sera escalado
+  scaleTargetRef:
+    # API version do recurso alvo
+    apiVersion: apps/v1
+    # Tipo do recurso (Deployment, StatefulSet, ReplicaSet)
+    kind: Deployment
+    # Nome do Deployment
+    name: demo-api
+
+  # Numero minimo de replicas
+  # HPA nunca vai escalar abaixo deste valor
+  minReplicas: 2
+
+  # Numero maximo de replicas
+  # HPA nunca vai escalar acima deste valor
+  # Defina baseado na capacidade do cluster
+  maxReplicas: 10
+
+  # Metricas usadas para escala
+  # Pode ter multiplas metricas (HPA usa a que resultar em mais replicas)
+  metrics:
+    # Metrica 1: CPU (utilizacao)
+    - type: Resource
+      resource:
+        # Nome do recurso (cpu ou memory)
+        name: cpu
+        target:
+          # type: Utilization = percentual do request
+          # type: AverageValue = valor absoluto medio
+          type: Utilization
+          # averageUtilization: target em percentual do request
+          # Ex: se request=100m e target=50%, escala quando usar >50m
+          # Valor recomendado: 50-70% (deixa margem para spikes)
+          averageUtilization: 50
+
+    # Metrica 2: Memoria (valor absoluto)
+    - type: Resource
+      resource:
+        # Nome do recurso
+        name: memory
+        target:
+          # type: AverageValue = valor absoluto medio por pod
+          # Preferivel para memoria (mais previsivel que percentual)
+          type: AverageValue
+          # averageValue: memoria media por pod antes de escalar
+          # Ex: escala quando memoria media > 100Mi
+          # Valor recomendado: 70-80% do request
+          averageValue: 100Mi
+
+  # behavior: controla a velocidade e comportamento da escala
+  # Permite customizar scale up/down para evitar thrashing (escala rapida demais)
+  # Ref: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#configurable-scaling-behavior
+  behavior:
+    # scaleUp: comportamento ao aumentar replicas
+    scaleUp:
+      # stabilizationWindowSeconds: janela de tempo para estabilizacao
+      # HPA olha para tras X segundos e usa o maior valor de replicas sugerido
+      # Valor 0 = sem estabilizacao (responde imediatamente)
+      # Valor padrao: 0 para scale up (resposta rapida)
+      stabilizationWindowSeconds: 0
+      # policies: politicas de escala (pode ter multiplas)
+      policies:
+        # Politica 1: aumenta ate 4 pods a cada 60 segundos
+        - type: Pods
+          value: 4
+          periodSeconds: 60
+        # Politica 2: aumenta ate 100% (dobra) a cada 60 segundos
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+      # selectPolicy: como escolher entre multiplas politicas
+      # Max = usa a politica que resultar em mais pods (padrao para scale up)
+      # Min = usa a politica que resultar em menos pods
+      # Disabled = desabilita scale up
+      selectPolicy: Max
+
+    # scaleDown: comportamento ao diminuir replicas
+    scaleDown:
+      # stabilizationWindowSeconds: janela de tempo para estabilizacao
+      # HPA olha para tras X segundos e usa o maior valor de replicas sugerido
+      # Valor padrao: 300 (5 minutos) para scale down
+      # Isso evita scale down prematuro (thrashing)
+      stabilizationWindowSeconds: 300
+      # policies: politicas de escala down
+      policies:
+        # Politica 1: remove ate 1 pod a cada 60 segundos
+        # Conservador para evitar remover muitos pods de uma vez
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+        # Politica 2: remove ate 10% a cada 60 segundos
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+      # selectPolicy: Min = usa a politica mais conservadora (remove menos pods)
+      # Isso evita scale down agressivo
+      selectPolicy: Min
+
+# NOTAS:
+#
+# 1. Monitorar o HPA:
+#    kubectl get hpa -n n3-m1-autoscale
+#    kubectl describe hpa demo-api-hpa -n n3-m1-autoscale
+#
+# 2. Testar escala:
+#    - Scale up: aumentar carga (stress endpoints)
+#    - Scale down: diminuir carga (aguardar stabilizationWindowSeconds)
+#
+# 3. Metricas recomendadas:
+#    - CPU: bom para workloads compute-intensive
+#    - Memoria: bom para workloads memory-intensive
+#    - Customizadas: para logica de negocio (ex: tamanho da fila)
+#
+# 4. Troubleshooting:
+#    - HPA nao escala: verificar se Metrics Server esta funcionando
+#    - kubectl top pods -n n3-m1-autoscale
+#    - kubectl top nodes
+#    - kubectl logs -n kube-system -l k8s-app=metrics-server
+#
+# 5. Behavior policies:
+#    - Scale up rapido, scale down lento (padrao)
+#    - Evita thrashing (escala rapida demais)
+#    - Ajuste conforme necessidade da aplicacao

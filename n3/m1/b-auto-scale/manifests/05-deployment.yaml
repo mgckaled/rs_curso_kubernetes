@@ -1,0 +1,235 @@
+# Deployment - Gerencia a criacao e atualizacao de Pods
+# Garante que o numero desejado de replicas esteja sempre rodando
+#
+# Neste exemplo, configuramos:
+# - Resource requests e limits (necessarios para HPA funcionar)
+# - Topology spread constraints (distribui pods entre zones)
+# - Pod anti-affinity (evita pods no mesmo node)
+# - Probes (liveness, readiness)
+# - Security context (boas praticas de seguranca)
+#
+# Memoria estimada por pod: ~64-128 MB
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # Nome do Deployment
+  name: demo-api
+  # Namespace onde sera criado
+  namespace: n3-m1-autoscale
+  labels:
+    app: demo-api
+    level: n3
+    module: m1
+    version: v1
+spec:
+  # Numero inicial de replicas
+  # Este valor sera controlado pelo HPA (Horizontal Pod Autoscaler)
+  replicas: 2
+  # Selector para identificar os Pods gerenciados por este Deployment
+  selector:
+    matchLabels:
+      app: demo-api
+  # Estrategia de atualizacao: RollingUpdate (padrao)
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # Maximo de pods indisponiveis durante update (25% do total)
+      maxUnavailable: 1
+      # Maximo de pods extras criados durante update (25% do total)
+      maxSurge: 1
+  # Template do Pod (define como cada pod sera criado)
+  template:
+    metadata:
+      labels:
+        # Labels usadas pelo selector acima e pelo Service
+        app: demo-api
+        version: v1
+        # Label adicional para topology spread
+        topology-spread-target: demo-api
+    spec:
+      # Topology Spread Constraints
+      # Distribui pods uniformemente entre zonas (high availability)
+      # Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/
+      topologySpreadConstraints:
+        # Constraint 1: Distribuir entre zonas
+        - maxSkew: 1
+          # topologyKey: label usada para identificar zonas
+          topologyKey: topology.kubernetes.io/zone
+          # whenUnsatisfiable: DoNotSchedule = nao agenda se nao conseguir satisfazer
+          # ScheduleAnyway = agenda mesmo sem satisfazer (best effort)
+          whenUnsatisfiable: ScheduleAnyway
+          # labelSelector: seleciona pods que participam desta distribuicao
+          labelSelector:
+            matchLabels:
+              topology-spread-target: demo-api
+        # Constraint 2: Distribuir entre nodes (evita colocar tudo no mesmo node)
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              topology-spread-target: demo-api
+
+      # Pod Anti-Affinity (reforco adicional)
+      # Prefere nao colocar pods da mesma app no mesmo node
+      # Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity
+      affinity:
+        podAntiAffinity:
+          # preferredDuringSchedulingIgnoredDuringExecution = soft constraint (prefere, mas nao exige)
+          # requiredDuringSchedulingIgnoredDuringExecution = hard constraint (exige)
+          preferredDuringSchedulingIgnoredDuringExecution:
+            # Peso desta regra (1-100, maior = mais importante)
+            - weight: 100
+              podAffinityTerm:
+                # Distribui pods com label app=demo-api
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - demo-api
+                # topologyKey: agrupa por hostname (node)
+                topologyKey: kubernetes.io/hostname
+
+      # Containers do Pod
+      containers:
+        - name: demo-api
+          # Imagem da aplicacao (use sua imagem ou build local)
+          # Para este projeto, assumimos que a imagem foi buildada localmente
+          # docker build -t demo-api:v1 ./apps/demo-api
+          image: demo-api:v1
+          # imagePullPolicy: IfNotPresent = usa cache local se existir
+          # Always = sempre faz pull
+          # Never = nunca faz pull
+          imagePullPolicy: IfNotPresent
+          # Porta exposta pelo container
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          # Variaveis de ambiente
+          # Ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
+          env:
+            # Variavel simples (hardcoded)
+            - name: LOG_LEVEL
+              value: "info"
+            # Variaveis do ConfigMap
+            - name: APP_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: demo-api-config
+                  key: APP_NAME
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: demo-api-config
+                  key: NODE_ENV
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: demo-api-config
+                  key: PORT
+            # Variaveis do Secret
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: demo-api-secret
+                  key: DATABASE_URL
+
+          # Resource Requests e Limits
+          # CRITICO: Necessario para o HPA funcionar corretamente
+          # Ref: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+          resources:
+            # Requests: recursos GARANTIDOS pelo scheduler
+            # O pod so sera agendado em um node com recursos disponiveis
+            requests:
+              # CPU em millicores (1000m = 1 CPU core)
+              # 100m = 10% de 1 core
+              cpu: 100m
+              # Memoria em bytes (Mi = Mebibytes, Gi = Gibibytes)
+              # 128Mi = 128 megabytes
+              memory: 128Mi
+            # Limits: recursos MAXIMOS que o pod pode usar
+            # CPU: throttling quando exceder (nao mata o pod)
+            # Memory: OOM kill quando exceder (mata o pod)
+            limits:
+              # 500m = 50% de 1 core (5x o request)
+              cpu: 500m
+              # 256Mi = 256 megabytes (2x o request)
+              memory: 256Mi
+
+          # Liveness Probe: verifica se o container esta funcionando
+          # Se falhar, o Kubernetes reinicia o container
+          # Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+          livenessProbe:
+            # HTTP GET request
+            httpGet:
+              path: /health
+              port: http
+              scheme: HTTP
+            # Aguarda 15 segundos antes de iniciar probes (tempo para app iniciar)
+            initialDelaySeconds: 15
+            # Intervalo entre probes (10 segundos)
+            periodSeconds: 10
+            # Timeout de cada probe (5 segundos)
+            timeoutSeconds: 5
+            # Numero de falhas consecutivas para considerar unhealthy
+            failureThreshold: 3
+            # Numero de sucessos consecutivos para considerar healthy apos falha
+            successThreshold: 1
+
+          # Readiness Probe: verifica se o container esta pronto para receber trafego
+          # Se falhar, o Kubernetes remove o pod do Service (nao recebe trafego)
+          # Diferenca para liveness: readiness nao reinicia o pod, apenas para de enviar trafego
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+              scheme: HTTP
+            # Aguarda 5 segundos (readiness pode comecar antes do liveness)
+            initialDelaySeconds: 5
+            # Verifica a cada 5 segundos (mais frequente que liveness)
+            periodSeconds: 5
+            # Timeout de 3 segundos
+            timeoutSeconds: 3
+            # Falha apos 3 tentativas
+            failureThreshold: 3
+            # Healthy apos 1 sucesso
+            successThreshold: 1
+
+          # Security Context: configuracoes de seguranca do container
+          # Best practices: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+          securityContext:
+            # Nao permite escalacao de privilegios
+            allowPrivilegeEscalation: false
+            # Remove todas capabilities (permissoes especiais do Linux)
+            capabilities:
+              drop:
+                - ALL
+            # Nao roda como root (seguranca)
+            runAsNonRoot: true
+            # User ID (nao-root)
+            runAsUser: 1000
+            # Group ID
+            runAsGroup: 1000
+            # Read-only root filesystem (seguranca adicional)
+            # Descomente se a app nao precisar escrever no filesystem
+            # readOnlyRootFilesystem: true
+
+      # Security Context do Pod (aplica a todos containers)
+      securityContext:
+        # fsGroup: define o grupo dono dos volumes montados
+        fsGroup: 1000
+
+      # terminationGracePeriodSeconds: tempo para graceful shutdown
+      # Permite que a aplicacao finalize requests em andamento antes de ser morta
+      # Padrao: 30 segundos
+      terminationGracePeriodSeconds: 30
+
+      # restartPolicy: politica de reinicio de containers
+      # Always = sempre reinicia se falhar (padrao)
+      # OnFailure = reinicia apenas se exit code != 0
+      # Never = nunca reinicia
+      restartPolicy: Always

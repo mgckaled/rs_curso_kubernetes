@@ -1,0 +1,43 @@
+# Service - Expoe a aplicacao dentro do cluster
+# Prove um endpoint estavel (ClusterIP) para acessar os pods
+#
+# Tipos de Service:
+# - ClusterIP: acessivel apenas dentro do cluster (padrao)
+# - NodePort: acessivel externamente via porta do node (30000-32767)
+# - LoadBalancer: cria um load balancer externo (requer cloud provider)
+# - ExternalName: mapeia para um DNS externo
+#
+# Neste caso, usamos ClusterIP pois acessaremos via port-forward para testes
+
+apiVersion: v1
+kind: Service
+metadata:
+  # Nome do Service (usado como DNS interno: demo-api.n3-m1-autoscale.svc.cluster.local)
+  name: demo-api
+  # Namespace onde sera criado
+  namespace: n3-m1-autoscale
+  labels:
+    app: demo-api
+    level: n3
+    module: m1
+spec:
+  # Tipo do Service: ClusterIP (acessivel apenas dentro do cluster)
+  type: ClusterIP
+  # Selector: identifica os Pods que receberao trafego deste Service
+  # Deve corresponder as labels do Deployment
+  selector:
+    app: demo-api
+  # Portas expostas pelo Service
+  ports:
+    # Porta HTTP
+    - name: http
+      # Porta do Service (outros pods acessam via esta porta)
+      port: 80
+      # Porta do container (targetPort) onde o trafego sera encaminhado
+      targetPort: http
+      # Protocolo (TCP ou UDP)
+      protocol: TCP
+  # sessionAffinity: define se requests da mesma origem vao para o mesmo pod
+  # None = load balance entre todos pods (padrao)
+  # ClientIP = requests do mesmo IP vao para o mesmo pod
+  sessionAffinity: None

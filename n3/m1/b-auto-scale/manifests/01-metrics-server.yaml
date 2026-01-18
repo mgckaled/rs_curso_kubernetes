@@ -1,0 +1,222 @@
+# Metrics Server - Componente necessario para HPA funcionar
+# Coleta metricas de CPU e memoria dos nodes e pods
+#
+# IMPORTANTE: Esta configuracao e especifica para Kind/ambientes locais
+# Em clusters gerenciados (EKS, GKE, AKS), o Metrics Server ja vem instalado
+#
+# Fonte: https://github.com/kubernetes-sigs/metrics-server
+# Memoria estimada: 50-100 MB
+
+---
+# ServiceAccount - Identidade usada pelo Metrics Server no cluster
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  # Nome da service account
+  name: metrics-server
+  # Namespace do sistema onde componentes core ficam
+  namespace: kube-system
+  labels:
+    # Labels para identificar o componente
+    k8s-app: metrics-server
+
+---
+# ClusterRole - Define permissoes que a ServiceAccount tera no cluster
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:metrics-server
+  labels:
+    k8s-app: metrics-server
+    # Label indicando que e parte do RBAC agregado
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+rules:
+  # Permissao para ler metricas dos nodes
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/metrics
+    verbs:
+      - get
+  # Permissao para ler metricas dos pods
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - nodes
+    verbs:
+      - get
+      - list
+      - watch
+
+---
+# ClusterRoleBinding - Liga a ServiceAccount ao ClusterRole
+# Isso concede as permissoes definidas no ClusterRole para a ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:metrics-server
+  labels:
+    k8s-app: metrics-server
+roleRef:
+  # Referencia ao ClusterRole criado acima
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:metrics-server
+subjects:
+  # ServiceAccount que recebera as permissoes
+  - kind: ServiceAccount
+    name: metrics-server
+    namespace: kube-system
+
+---
+# Service - Expoe o Metrics Server para outros componentes do cluster
+apiVersion: v1
+kind: Service
+metadata:
+  name: metrics-server
+  namespace: kube-system
+  labels:
+    k8s-app: metrics-server
+spec:
+  # Selector para identificar os pods do Metrics Server
+  selector:
+    k8s-app: metrics-server
+  ports:
+    # Porta HTTPS usada para consultar metricas
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: https
+
+---
+# Deployment - Define como o Metrics Server sera executado
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-server
+  namespace: kube-system
+  labels:
+    k8s-app: metrics-server
+spec:
+  # Uma unica replica e suficiente para ambientes pequenos
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: metrics-server
+  # Estrategia de atualizacao: rolling update
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # Permite 0 pods indisponiveis durante update
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        k8s-app: metrics-server
+    spec:
+      # ServiceAccount com permissoes necessarias
+      serviceAccountName: metrics-server
+      # Define prioridade do pod (system-critical)
+      priorityClassName: system-cluster-critical
+      # Prefere agendar no control-plane (menos recursos usados nos workers)
+      nodeSelector:
+        kubernetes.io/os: linux
+      containers:
+        - name: metrics-server
+          # Imagem oficial do Metrics Server
+          # Versao v0.7.2 (estavel, testada)
+          image: registry.k8s.io/metrics-server/metrics-server:v0.7.2
+          # Policy para pull da imagem
+          imagePullPolicy: IfNotPresent
+          # Argumentos customizados para funcionar no Kind
+          args:
+            # Desabilita verificacao de certificado TLS (necessario para Kind)
+            # ATENCAO: Em producao, NUNCA use essa flag
+            - --kubelet-insecure-tls
+            # Prefere usar NodeInternalIP ao inves de hostname
+            # Necessario em alguns ambientes locais
+            - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+            # Endpoint de metricas do proprio Metrics Server
+            - --metric-resolution=15s
+          # Recursos do container
+          resources:
+            # Requests: garantidos pelo scheduler
+            requests:
+              cpu: 100m      # 0.1 CPU (10% de 1 core)
+              memory: 200Mi  # 200 megabytes
+            # Limits: maximo que pode usar
+            limits:
+              cpu: 200m      # 0.2 CPU (20% de 1 core)
+              memory: 400Mi  # 400 megabytes
+          # Porta exposta pelo container
+          ports:
+            - name: https
+              containerPort: 10250
+              protocol: TCP
+          # Readiness probe: verifica se esta pronto para receber trafego
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: https
+              scheme: HTTPS
+            # Aguarda 20 segundos antes de iniciar probes
+            initialDelaySeconds: 20
+            # Verifica a cada 10 segundos
+            periodSeconds: 10
+            # Falha se nao responder em 1 segundo
+            failureThreshold: 3
+          # Liveness probe: verifica se esta funcionando corretamente
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: https
+              scheme: HTTPS
+            # Aguarda 20 segundos antes de iniciar probes
+            initialDelaySeconds: 20
+            # Verifica a cada 10 segundos
+            periodSeconds: 10
+            # Falha se nao responder em 1 segundo
+            failureThreshold: 3
+          # Security context: configuracoes de seguranca do container
+          securityContext:
+            # Nao permite escalacao de privilegios
+            allowPrivilegeEscalation: false
+            # Capabilities que podem ser usadas
+            capabilities:
+              drop:
+                # Remove todas capabilities por padrao
+                - ALL
+            # Roda como usuario nao-root
+            runAsNonRoot: true
+            # ID do usuario (nao-root)
+            runAsUser: 1000
+          # Volume mounts (nenhum necessario para Metrics Server)
+          volumeMounts: []
+      # Volumes (nenhum necessario)
+      volumes: []
+
+---
+# APIService - Registra o Metrics Server como provedor de metricas
+# Isso permite que o HPA e kubectl top usem as metricas
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1beta1.metrics.k8s.io
+  labels:
+    k8s-app: metrics-server
+spec:
+  # Service que prove as metricas
+  service:
+    name: metrics-server
+    namespace: kube-system
+  # Grupo e versao da API de metricas
+  group: metrics.k8s.io
+  version: v1beta1
+  # Certificado TLS sera verificado (false para Kind)
+  insecureSkipTLSVerify: true
+  # Prioridade deste APIService
+  groupPriorityMinimum: 100
+  versionPriority: 100

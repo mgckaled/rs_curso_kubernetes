@@ -1,0 +1,101 @@
+# PodDisruptionBudget (PDB) - Garante disponibilidade durante interrupcoes voluntarias
+#
+# Interrupcoes podem ser:
+# - Voluntarias (planejadas):
+#   - Node drain (manutencao)
+#   - Cluster autoscaler removendo nodes
+#   - kubectl delete pod
+#   - Deployment rolling update
+# - Involuntarias (nao planejadas):
+#   - Falha de hardware
+#   - Node crash
+#   - Kernel panic
+#
+# PDB protege apenas contra interrupcoes VOLUNTARIAS
+#
+# Estrategias:
+# - minAvailable: numero minimo de pods que devem estar disponiveis
+# - maxUnavailable: numero maximo de pods que podem estar indisponiveis
+#
+# Escolha:
+# - Use minAvailable quando quiser garantir um numero minimo sempre rodando
+# - Use maxUnavailable quando quiser limitar quantos podem cair simultaneamente
+#
+# Ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb/
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  # Nome do PDB
+  name: demo-api-pdb
+  # Namespace onde sera criado (mesmo do Deployment)
+  namespace: n3-m1-autoscale
+  labels:
+    app: demo-api
+    level: n3
+    module: m1
+spec:
+  # minAvailable: numero minimo de pods que devem estar disponiveis
+  # Pode ser um numero absoluto (ex: 2) ou percentual (ex: 50%)
+  #
+  # Exemplo: se minAvailable=2 e replicas=3, apenas 1 pod pode ser evicted por vez
+  # Durante drain, o Kubernetes aguarda o pod ser recriado antes de drenar o proximo
+  #
+  # Neste caso: minAvailable=1 significa pelo menos 1 pod sempre rodando
+  minAvailable: 1
+
+  # maxUnavailable: numero maximo de pods que podem estar indisponiveis
+  # Alternativa ao minAvailable (use apenas um dos dois)
+  # Exemplo: maxUnavailable=1 significa no maximo 1 pod pode estar down por vez
+  #
+  # Descomente para usar maxUnavailable ao inves de minAvailable:
+  # maxUnavailable: 1
+
+  # selector: identifica os pods protegidos por este PDB
+  # Deve corresponder as labels do Deployment
+  selector:
+    matchLabels:
+      app: demo-api
+
+  # unhealthyPodEvictionPolicy: politica para eviction de pods unhealthy
+  # Valores:
+  # - IfHealthyBudget: evict apenas se o budget estiver saudavel (padrao)
+  # - AlwaysAllow: sempre permite eviction, mesmo de pods unhealthy
+  #
+  # Recomendacao: AlwaysAllow para evitar que pods unhealthy bloqueiem drain
+  # Disponivel a partir do Kubernetes 1.26+
+  # Descomente para habilitar:
+  # unhealthyPodEvictionPolicy: AlwaysAllow
+
+# NOTAS:
+#
+# 1. PDB e HPA juntos:
+#    - HPA controla o numero de replicas baseado em metricas
+#    - PDB garante disponibilidade minima durante interrupcoes
+#    - minAvailable deve ser < minReplicas do HPA
+#    - Ex: HPA minReplicas=2, PDB minAvailable=1
+#
+# 2. Monitorar PDB:
+#    kubectl get pdb -n n3-m1-autoscale
+#    kubectl describe pdb demo-api-pdb -n n3-m1-autoscale
+#
+# 3. Testar PDB:
+#    - Drenar um node: kubectl drain <node-name> --ignore-daemonsets
+#    - Observe que pods sao removidos gradualmente respeitando o PDB
+#    - PDB previne remocao de todos pods simultaneamente
+#
+# 4. Valores recomendados:
+#    - Para HA: minAvailable >= 2 ou maxUnavailable=1
+#    - Para dev/staging: minAvailable=1 ou maxUnavailable=50%
+#    - Balancear entre disponibilidade e velocidade de drain
+#
+# 5. Cuidados:
+#    - PDB muito restritivo (ex: minAvailable=replicas) impede drain
+#    - PDB muito permissivo (ex: minAvailable=0) nao protege
+#    - Se replicas < minAvailable, PDB bloqueia eviction
+#    - Exemplo: se replicas=1 e minAvailable=2, nenhum pod pode ser evicted
+#
+# 6. Relacao com Cluster Autoscaler:
+#    - Cluster Autoscaler respeita PDB ao remover nodes
+#    - Se nao conseguir evict pods respeitando PDB, node nao e removido
+#    - PDB ajuda a prevenir downtime durante scale down de nodes

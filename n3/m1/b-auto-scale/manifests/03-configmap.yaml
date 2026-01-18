@@ -1,0 +1,34 @@
+# ConfigMap - Armazena configuracoes nao-sensiveis da aplicacao
+# Permite separar configuracao do codigo da aplicacao
+#
+# Beneficios:
+# - Configuracao externa (nao hardcoded no codigo)
+# - Reutilizacao (mesma imagem em diferentes ambientes)
+# - Atualizacao sem rebuild (muda ConfigMap, nao a imagem)
+#
+# IMPORTANTE: Nao armazene dados sensiveis aqui (use Secret)
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  # Nome do ConfigMap (sera referenciado no Deployment)
+  name: demo-api-config
+  # Namespace onde sera criado
+  namespace: n3-m1-autoscale
+  labels:
+    app: demo-api
+    level: n3
+    module: m1
+# Dados do ConfigMap (key-value pairs)
+data:
+  # Nome da aplicacao
+  APP_NAME: "demo-api"
+  # Ambiente de execucao (development, staging, production)
+  NODE_ENV: "production"
+  # Porta onde a aplicacao escutara
+  PORT: "3000"
+  # URL do banco de dados (nao-sensivel, apenas host/porta)
+  # Credenciais virao do Secret
+  DATABASE_HOST: "postgres"
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "demo_db"

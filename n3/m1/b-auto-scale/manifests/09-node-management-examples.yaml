@@ -1,0 +1,297 @@
+# Exemplos de Node Management (Affinity, Taints, Tolerations)
+#
+# IMPORTANTE: Este arquivo NAO deve ser aplicado diretamente!
+# Ele contem exemplos didaticos para demonstrar conceitos de:
+# - Node Affinity (afinidade de pods com nodes)
+# - Node Anti-Affinity (repulsao de pods de nodes)
+# - Taints (marcas nos nodes que repelem pods)
+# - Tolerations (permissoes nos pods para tolerar taints)
+#
+# Para aplicar, copie o exemplo desejado para um arquivo separado
+
+---
+# EXEMPLO 1: Node Affinity - Required (Hard Constraint)
+# Pod DEVE ser agendado em nodes com label especifica
+# Se nao houver nodes disponiveis, pod fica Pending
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-node-affinity-required
+  namespace: n3-m1-autoscale
+spec:
+  # affinity: define regras de afinidade
+  affinity:
+    # nodeAffinity: afinidade com nodes (baseado em labels)
+    nodeAffinity:
+      # requiredDuringSchedulingIgnoredDuringExecution:
+      # - Required = obrigatorio (hard constraint)
+      # - DuringScheduling = aplica durante agendamento
+      # - IgnoredDuringExecution = ignora se node mudar depois
+      requiredDuringSchedulingIgnoredDuringExecution:
+        # nodeSelectorTerms: lista de termos (OR entre termos)
+        nodeSelectorTerms:
+          # Termo 1: node deve ter label topology.kubernetes.io/zone=zone-a
+          - matchExpressions:
+              - key: topology.kubernetes.io/zone
+                # Operadores: In, NotIn, Exists, DoesNotExist, Gt, Lt
+                operator: In
+                values:
+                  - zone-a
+  containers:
+    - name: nginx
+      image: nginx:alpine
+
+---
+# EXEMPLO 2: Node Affinity - Preferred (Soft Constraint)
+# Pod PREFERE ser agendado em nodes com label especifica
+# Se nao houver nodes disponiveis, agenda em qualquer node
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-node-affinity-preferred
+  namespace: n3-m1-autoscale
+spec:
+  affinity:
+    nodeAffinity:
+      # preferredDuringSchedulingIgnoredDuringExecution:
+      # - Preferred = preferencia (soft constraint)
+      # - Scheduler tenta satisfazer, mas nao exige
+      preferredDuringSchedulingIgnoredDuringExecution:
+        # weight: peso desta preferencia (1-100)
+        # Maior peso = maior prioridade
+        - weight: 80
+          preference:
+            matchExpressions:
+              # Prefere nodes com label node-type=standard
+              - key: node-type
+                operator: In
+                values:
+                  - standard
+        # Segunda preferencia (peso menor)
+        - weight: 20
+          preference:
+            matchExpressions:
+              # Prefere nodes na zone-b
+              - key: topology.kubernetes.io/zone
+                operator: In
+                values:
+                  - zone-b
+  containers:
+    - name: nginx
+      image: nginx:alpine
+
+---
+# EXEMPLO 3: Pod Anti-Affinity - Evitar mesmo node
+# Evita agendar pods da mesma app no mesmo node (HA)
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-anti-affinity
+  namespace: n3-m1-autoscale
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: example-anti-affinity
+  template:
+    metadata:
+      labels:
+        app: example-anti-affinity
+    spec:
+      affinity:
+        # podAntiAffinity: evita colocar pods proximos
+        podAntiAffinity:
+          # requiredDuringSchedulingIgnoredDuringExecution:
+          # Hard constraint: pods NAO podem estar no mesmo node
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  # Evita pods com mesma label app=example-anti-affinity
+                  - key: app
+                    operator: In
+                    values:
+                      - example-anti-affinity
+              # topologyKey: agrupa por hostname (cada node = topologia diferente)
+              # Outros valores comuns:
+              # - kubernetes.io/hostname (node)
+              # - topology.kubernetes.io/zone (zona)
+              # - topology.kubernetes.io/region (regiao)
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: nginx
+          image: nginx:alpine
+
+---
+# EXEMPLO 4: Taint e Toleration
+# Taints marcam nodes para repelir pods
+# Tolerations permitem pods serem agendados em nodes com taints
+#
+# Para adicionar taint a um node:
+# kubectl taint nodes <node-name> key=value:Effect
+#
+# Efeitos:
+# - NoSchedule: nao agenda novos pods (pods existentes continuam)
+# - PreferNoSchedule: prefere nao agendar (soft)
+# - NoExecute: nao agenda novos pods E remove pods existentes
+#
+# Para remover taint:
+# kubectl taint nodes <node-name> key=value:Effect-
+
+# Exemplo de pod com toleration
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-toleration
+  namespace: n3-m1-autoscale
+spec:
+  # tolerations: lista de taints que o pod tolera
+  tolerations:
+    # Toleration 1: tolera taint node-role=master:NoSchedule
+    # Permite pod ser agendado em control-plane nodes (nao recomendado)
+    - key: node-role.kubernetes.io/control-plane
+      # operator: Equal (key=value) ou Exists (apenas key)
+      operator: Equal
+      value: ""
+      effect: NoSchedule
+
+    # Toleration 2: tolera taint dedicated=gpu:NoExecute
+    # Permite pod ser agendado em nodes dedicados
+    - key: dedicated
+      operator: Equal
+      value: gpu
+      effect: NoExecute
+      # tolerationSeconds: tempo para eviction apos node receber taint
+      # Usado com NoExecute (opcional)
+      tolerationSeconds: 300
+
+    # Toleration 3: tolera qualquer taint com key=maintenance
+    # operator=Exists ignora value
+    - key: maintenance
+      operator: Exists
+      effect: NoSchedule
+
+  containers:
+    - name: nginx
+      image: nginx:alpine
+
+---
+# EXEMPLO 5: Simulando Node Drain com Taint
+# Durante node drain, Kubernetes adiciona taint NoExecute automaticamente
+#
+# Simular node drain manual:
+# 1. kubectl taint nodes <node-name> node.kubernetes.io/unschedulable:NoExecute
+# 2. Pods sem toleration sao evicted
+# 3. Pods com toleration continuam rodando
+#
+# Para cordon (impedir novos pods):
+# kubectl cordon <node-name>
+#
+# Para uncordon (permitir novos pods):
+# kubectl uncordon <node-name>
+#
+# Para drain (evict pods + cordon):
+# kubectl drain <node-name> --ignore-daemonsets --delete-emptydir-data
+
+# Pod que tolera node drain (continua rodando durante manutencao)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-drain-tolerant
+  namespace: n3-m1-autoscale
+spec:
+  tolerations:
+    # Tolera taint de unschedulable (adicionado por cordon/drain)
+    - key: node.kubernetes.io/unschedulable
+      operator: Exists
+      effect: NoSchedule
+    # Tolera taint de disk pressure
+    - key: node.kubernetes.io/disk-pressure
+      operator: Exists
+      effect: NoSchedule
+    # Tolera taint de memory pressure
+    - key: node.kubernetes.io/memory-pressure
+      operator: Exists
+      effect: NoSchedule
+  containers:
+    - name: nginx
+      image: nginx:alpine
+
+---
+# EXEMPLO 6: DaemonSet com Tolerations
+# DaemonSets geralmente precisam rodar em todos nodes, incluindo control-plane
+# Por isso, adicionam tolerations para taints comuns
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: example-daemonset
+  namespace: n3-m1-autoscale
+spec:
+  selector:
+    matchLabels:
+      app: example-daemonset
+  template:
+    metadata:
+      labels:
+        app: example-daemonset
+    spec:
+      # Tolerations para permitir rodar em control-plane e nodes com problemas
+      tolerations:
+        # Tolera control-plane nodes
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+        # Tolera nodes com problemas (para monitoramento, logs, etc)
+        - key: node.kubernetes.io/not-ready
+          operator: Exists
+          effect: NoExecute
+        - key: node.kubernetes.io/unreachable
+          operator: Exists
+          effect: NoExecute
+        - key: node.kubernetes.io/disk-pressure
+          operator: Exists
+          effect: NoSchedule
+        - key: node.kubernetes.io/memory-pressure
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: nginx
+          image: nginx:alpine
+
+# COMANDOS UTEIS:
+#
+# 1. Ver labels dos nodes:
+#    kubectl get nodes --show-labels
+#
+# 2. Ver taints dos nodes:
+#    kubectl describe node <node-name> | grep -i taint
+#
+# 3. Adicionar label a um node:
+#    kubectl label nodes <node-name> key=value
+#
+# 4. Remover label de um node:
+#    kubectl label nodes <node-name> key-
+#
+# 5. Adicionar taint a um node:
+#    kubectl taint nodes <node-name> key=value:NoSchedule
+#
+# 6. Remover taint de um node:
+#    kubectl taint nodes <node-name> key=value:NoSchedule-
+#
+# 7. Cordon (impedir novos pods):
+#    kubectl cordon <node-name>
+#
+# 8. Uncordon (permitir novos pods):
+#    kubectl uncordon <node-name>
+#
+# 9. Drain (evict pods):
+#    kubectl drain <node-name> --ignore-daemonsets --delete-emptydir-data
+#
+# 10. Ver pods por node:
+#     kubectl get pods -n n3-m1-autoscale -o wide

@@ -1,0 +1,19 @@
+# Namespace - Isolamento logico de recursos no cluster
+# Permite organizar e separar recursos por projeto/ambiente
+#
+# Beneficios:
+# - Isolamento de recursos (RBAC, Network Policies, Resource Quotas)
+# - Organizacao (facilita gerenciamento)
+# - Multi-tenancy (multiplos times/projetos no mesmo cluster)
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  # Nome do namespace onde os recursos serao criados
+  name: n3-m1-autoscale
+  labels:
+    # Label para identificar o nivel/modulo
+    level: n3
+    module: m1
+    # Label para identificar o tipo de ambiente
+    environment: learning

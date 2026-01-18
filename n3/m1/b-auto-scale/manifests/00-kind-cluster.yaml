@@ -1,0 +1,65 @@
+# Configuracao do Cluster Kind para Simulacao de Auto Escala de Nos
+# Nivel 3 - Modulo 1 - Auto Escala de Nos
+#
+# Este cluster simula um ambiente gerenciado (como EKS/GKE/AKS) com:
+# - 1 control plane (gerencia o cluster)
+# - 2 worker nodes (executam os pods das aplicacoes)
+# - Labels customizadas para simular diferentes tipos de nodes/zones
+#
+# Memoria estimada: ~1.1-1.4 GB (control-plane: 500-700 MB + 2 workers: 300-400 MB cada)
+
+# API version do Kind para configuracao de cluster
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+
+# Nome do cluster (usar com: kind create cluster --config=00-kind-cluster.yaml)
+name: n3-m1-autoscale
+
+# Definicao dos nos do cluster
+nodes:
+  # Control Plane Node
+  # Responsavel por gerenciar o estado do cluster
+  # Componentes: etcd, kube-apiserver, kube-scheduler, kube-controller-manager
+  - role: control-plane
+    # Mapeia porta do host para o node (para acessar services do tipo NodePort)
+    extraPortMappings:
+      # Porta 30000 no host -> porta 30000 no node
+      - containerPort: 30000
+        hostPort: 30000
+        protocol: TCP
+
+  # Worker Node 1
+  # Node trabalhador que executara os pods da aplicacao
+  # Nota: labels customizadas sao usadas para simular node groups e zonas
+  - role: worker
+    # Labels aplicadas ao node (similares ao que cloud providers fazem)
+    labels:
+      # Label customizada para identificar tipo de node
+      # Usada para node affinity/anti-affinity
+      node-type: standard
+      # Label de topologia para simular zonas de disponibilidade
+      # Esta e a label padrao do Kubernetes para identificar zonas
+      # Ref: https://kubernetes.io/docs/reference/labels-annotations-taints/#topologykubernetesiozone
+      topology.kubernetes.io/zone: zone-a
+
+  # Worker Node 2
+  # Segundo node trabalhador para demonstrar distribuicao de carga entre nodes
+  # Labels diferentes simulam diferentes zonas (high availability)
+  - role: worker
+    labels:
+      # Mesmo tipo de node (standard) para manter homogeneidade
+      node-type: standard
+      # Zona diferente para simular multi-AZ deployment
+      topology.kubernetes.io/zone: zone-b
+
+# Configuracoes de rede do cluster
+networking:
+  # Desabilita CNI customizado (usa o padrao do Kind)
+  # CNI = Container Network Interface (gerencia rede entre pods)
+  disableDefaultCNI: false
+  # Range de IPs para os pods (cada pod recebe um IP desse range)
+  # Formato CIDR: 10.244.0.0/16 = 65536 IPs possiveis
+  podSubnet: "10.244.0.0/16"
+  # Range de IPs para os services (cada service recebe um ClusterIP desse range)
+  # Formato CIDR: 10.96.0.0/12 = 1048576 IPs possiveis
+  serviceSubnet: "10.96.0.0/12"

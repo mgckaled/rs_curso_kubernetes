@@ -1,0 +1,172 @@
+# Cluster Kind para Simulação de Conceitos Karpenter
+# Criação: kind create cluster --config 00-cluster-kind.yaml
+# Deleção: kind delete cluster --name karpenter-demo
+
+# Especificação do cluster
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+
+# Nome do cluster
+name: karpenter-demo
+
+# Configuração de nós
+nodes:
+  # Control Plane (1 nó)
+  # Responsável pelo API server, etcd, scheduler, controller-manager
+  - role: control-plane
+    # Labels customizados
+    labels:
+      # Identificar como control-plane
+      node-role.kubernetes.io/control-plane: ""
+    # Configurações extras do kubelet
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            # Reduzir uso de memória
+            max-pods: "110"
+            # Configurações de garbage collection
+            image-gc-high-threshold: "85"
+            image-gc-low-threshold: "80"
+
+  # Worker Node 1 - Simula Zona A
+  - role: worker
+    # Labels para simular ambiente AWS
+    labels:
+      # Simular zona de disponibilidade A
+      topology.kubernetes.io/zone: zone-a
+      # Simular região
+      topology.kubernetes.io/region: local-region
+      # Simular tipo de instância
+      node.kubernetes.io/instance-type: t3.medium
+      # Simular família de instância
+      karpenter.k8s.aws/instance-family: t3
+      # Simular tipo de capacidade (on-demand vs spot)
+      karpenter.sh/capacity-type: on-demand
+      # Simular tipo de disco
+      disk-type: ssd
+      # Label customizada para affinity
+      workload-tier: application
+    # Configurações do kubelet
+    kubeadmConfigPatches:
+      - |
+        kind: JoinConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            max-pods: "110"
+            # Reservar recursos para sistema
+            system-reserved: "cpu=100m,memory=256Mi"
+            # Reservar recursos para kubelet
+            kube-reserved: "cpu=100m,memory=256Mi"
+            # Configurações de garbage collection
+            image-gc-high-threshold: "85"
+            image-gc-low-threshold: "80"
+
+  # Worker Node 2 - Simula Zona B
+  - role: worker
+    labels:
+      # Simular zona de disponibilidade B
+      topology.kubernetes.io/zone: zone-b
+      topology.kubernetes.io/region: local-region
+      # Simular tipo de instância diferente
+      node.kubernetes.io/instance-type: t3.large
+      karpenter.k8s.aws/instance-family: t3
+      # Simular capacidade on-demand
+      karpenter.sh/capacity-type: on-demand
+      disk-type: ssd
+      workload-tier: application
+    kubeadmConfigPatches:
+      - |
+        kind: JoinConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            max-pods: "110"
+            system-reserved: "cpu=100m,memory=256Mi"
+            kube-reserved: "cpu=100m,memory=256Mi"
+            image-gc-high-threshold: "85"
+            image-gc-low-threshold: "80"
+
+  # Worker Node 3 - Simula Zona C
+  - role: worker
+    labels:
+      # Simular zona de disponibilidade C
+      topology.kubernetes.io/zone: zone-c
+      topology.kubernetes.io/region: local-region
+      # Simular tipo de instância otimizada para computação
+      node.kubernetes.io/instance-type: c5.xlarge
+      karpenter.k8s.aws/instance-family: c5
+      # Simular instância Spot (tolerante a interrupções)
+      karpenter.sh/capacity-type: spot
+      # Simular disco NVMe (mais rápido)
+      disk-type: nvme
+      workload-tier: batch
+    kubeadmConfigPatches:
+      - |
+        kind: JoinConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            max-pods: "110"
+            system-reserved: "cpu=100m,memory=256Mi"
+            kube-reserved: "cpu=100m,memory=256Mi"
+            image-gc-high-threshold: "85"
+            image-gc-low-threshold: "80"
+
+# Configurações de rede
+networking:
+  # Desabilitar IPv6 para economizar recursos
+  ipFamily: ipv4
+  # CIDR para pods
+  podSubnet: "10.244.0.0/16"
+  # CIDR para services
+  serviceSubnet: "10.96.0.0/16"
+
+# Configurações extras do cluster
+kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    apiServer:
+      # Configurações do API Server
+      extraArgs:
+        # Desabilitar admission controllers não essenciais para economizar recursos
+        enable-admission-plugins: "NodeRestriction"
+    controllerManager:
+      # Configurações do Controller Manager
+      extraArgs:
+        # Intervalo de sincronização (menor = mais responsivo, mais recursos)
+        node-monitor-period: "5s"
+        # Tempo para marcar nó como unhealthy
+        node-monitor-grace-period: "40s"
+    scheduler:
+      # Configurações do Scheduler
+      extraArgs:
+        # Logging
+        v: "2"
+
+# Configurações de feature gates (features experimentais)
+featureGates:
+  # Habilitar topology aware hints
+  TopologyAwareHints: true
+  # Habilitar PodSecurity admission
+  PodSecurity: true
+
+# Configurações de containerd runtime
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5000"]
+      endpoint = ["http://localhost:5000"]
+    [plugins."io.containerd.grpc.v1.cri"]
+      # Configurações de garbage collection
+      [plugins."io.containerd.grpc.v1.cri".containerd]
+        snapshotter = "overlayfs"
+      # Limitar uso de memória do containerd
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+          SystemdCgroup = true
+
+# Estimativa de recursos:
+# Control Plane: ~500-700MB
+# Worker 1: ~400-500MB
+# Worker 2: ~400-500MB
+# Worker 3: ~400-500MB
+# Total: ~1.7-2.2GB (dentro do limite de 2.5GB disponível)

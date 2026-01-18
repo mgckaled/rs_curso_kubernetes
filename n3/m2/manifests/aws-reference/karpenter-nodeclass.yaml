@@ -1,0 +1,374 @@
+# Karpenter EC2NodeClass - Configurações específicas AWS
+# Aplicar com: kubectl apply -f karpenter-nodeclass.yaml
+
+---
+# EC2NodeClass: Default
+# Configuração padrão para workloads gerais
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: default
+spec:
+  # Família de AMI (Amazon Machine Image)
+  # AL2023 = Amazon Linux 2023 (recomendado, otimizado para EKS)
+  amiFamily: AL2023
+
+  # Seletor de AMI personalizado (opcional)
+  # Descomente para usar AMI específica ao invés de amiFamily
+  # amiSelectorTerms:
+  #   - id: ami-0abcd1234efgh5678
+
+  # IAM Role anexada às instâncias como Instance Profile
+  # Esta role permite que o nó:
+  # - Puxe imagens do ECR
+  # - Registre-se no cluster EKS
+  # - Execute kubelet
+  role: KarpenterNodeRole
+
+  # Seleção de subnets via tags
+  # Karpenter usa essas subnets para lançar instâncias
+  subnetSelectorTerms:
+    # Seleciona todas subnets com tag karpenter.sh/discovery
+    - tags:
+        karpenter.sh/discovery: my-cluster
+        # Apenas subnets privadas (NUNCA públicas)
+        tier: private
+
+  # Seleção de security groups via tags
+  # Estes SGs serão anexados às instâncias EC2
+  securityGroupSelectorTerms:
+    # Security group do cluster
+    - tags:
+        karpenter.sh/discovery: my-cluster
+        type: node
+
+  # Configuração de discos EBS
+  blockDeviceMappings:
+    # Disco raiz
+    - deviceName: /dev/xvda
+      ebs:
+        # Tamanho do disco
+        volumeSize: 100Gi
+        # Tipo de volume
+        # gp3: SSD de uso geral (recomendado)
+        # gp2: SSD legado
+        # io1/io2: SSD de alta performance
+        # st1: HDD otimizado para throughput
+        volumeType: gp3
+        # IOPS (apenas para gp3, io1, io2)
+        iops: 3000
+        # Throughput em MiB/s (apenas para gp3)
+        throughput: 125
+        # Criptografia habilitada
+        encrypted: true
+        # KMS key para criptografia (opcional)
+        # kmsKeyID: arn:aws:kms:us-east-1:123456789012:key/abc-def
+        # Deletar disco quando instância terminar
+        deleteOnTermination: true
+
+  # Tags aplicadas às instâncias EC2
+  # Úteis para:
+  # - Cost allocation
+  # - Automação
+  # - Compliance
+  tags:
+    Environment: production
+    ManagedBy: karpenter
+    Team: platform
+    CostCenter: engineering
+
+  # Metadata options (IMDSv2)
+  # Configurações de segurança para Instance Metadata Service
+  metadataOptions:
+    # Habilitar endpoint de metadata
+    httpEndpoint: enabled
+    # Desabilitar IPv6
+    httpProtocolIPv6: disabled
+    # Hop limit (1 = apenas da instância, 2 = permite containers)
+    httpPutResponseHopLimit: 2
+    # Forçar uso de tokens (IMDSv2) - RECOMENDADO
+    httpTokens: required
+
+  # User data customizado (script bash)
+  # Executado ANTES do bootstrap do EKS
+  # Use para instalar software adicional, configurar sistema, etc.
+  userData: |
+    #!/bin/bash
+    set -euo pipefail
+
+    # Instalar CloudWatch agent
+    yum install -y amazon-cloudwatch-agent
+
+    # Configurar CloudWatch
+    /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+      -a fetch-config \
+      -m ec2 \
+      -c ssm:AmazonCloudWatch-linux \
+      -s
+
+    # Configurações customizadas do kubelet
+    echo 'KUBELET_EXTRA_ARGS="--max-pods=110 --kube-reserved=cpu=100m,memory=0.5Gi,ephemeral-storage=1Gi"' >> /etc/sysconfig/kubelet
+
+    # Instalar tools adicionais
+    yum install -y htop iotop sysstat
+
+---
+# EC2NodeClass: Bottlerocket
+# Sistema operacional focado em segurança e containers
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: bottlerocket
+spec:
+  # Bottlerocket OS
+  # - Imagem mínima focada em containers
+  # - Imutável (atualizações atômicas)
+  # - API para configuração (sem SSH)
+  amiFamily: Bottlerocket
+
+  role: KarpenterNodeRole
+
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: my-cluster
+        tier: private
+
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: my-cluster
+
+  blockDeviceMappings:
+    # Disco do sistema operacional (pequeno, apenas OS)
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 20Gi
+        volumeType: gp3
+        encrypted: true
+        deleteOnTermination: true
+
+    # Disco de dados (containers e imagens)
+    - deviceName: /dev/xvdb
+      ebs:
+        volumeSize: 100Gi
+        volumeType: gp3
+        iops: 3000
+        throughput: 125
+        encrypted: true
+        deleteOnTermination: true
+
+  tags:
+    OS: bottlerocket
+    Security: hardened
+    ManagedBy: karpenter
+
+  metadataOptions:
+    httpEndpoint: enabled
+    httpProtocolIPv6: disabled
+    httpPutResponseHopLimit: 2
+    httpTokens: required
+
+  # User data para Bottlerocket (formato TOML)
+  userData: |
+    [settings.kubernetes]
+    max-pods = 110
+
+    [settings.kubernetes.node-labels]
+    "os" = "bottlerocket"
+
+    [settings.kubernetes.node-taints]
+    # Opcional: adicionar taints
+
+    [settings.host-containers.admin]
+    enabled = false
+
+    [settings.host-containers.control]
+    enabled = true
+
+---
+# EC2NodeClass: GPU
+# Instâncias com GPU para ML/AI workloads
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: gpu
+spec:
+  # Amazon Linux 2023 com drivers GPU
+  amiFamily: AL2023
+
+  role: KarpenterNodeRole
+
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: my-cluster
+        tier: private
+
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: my-cluster
+
+  blockDeviceMappings:
+    # Disco maior para modelos ML
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 500Gi  # Modelos ML são grandes
+        volumeType: gp3
+        iops: 16000  # IOPS máximo para gp3
+        throughput: 1000  # Throughput máximo para gp3
+        encrypted: true
+        deleteOnTermination: true
+
+  tags:
+    Accelerator: nvidia
+    WorkloadType: ml
+    ManagedBy: karpenter
+    CostCenter: ml-team
+
+  metadataOptions:
+    httpEndpoint: enabled
+    httpProtocolIPv6: disabled
+    httpPutResponseHopLimit: 2
+    httpTokens: required
+
+  # Instalar NVIDIA drivers e container runtime
+  userData: |
+    #!/bin/bash
+    set -euo pipefail
+
+    # Instalar NVIDIA drivers
+    yum install -y kernel-devel-$(uname -r) kernel-headers-$(uname -r)
+
+    # Instalar NVIDIA container toolkit
+    distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+    curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.repo | \
+      tee /etc/yum.repos.d/nvidia-container-toolkit.repo
+
+    yum install -y nvidia-container-toolkit
+    nvidia-ctk runtime configure --runtime=containerd
+
+    # Configurar kubelet para GPU
+    echo 'KUBELET_EXTRA_ARGS="--max-pods=110 --feature-gates=DevicePlugins=true"' >> /etc/sysconfig/kubelet
+
+    # Instalar NVIDIA device plugin (será executado como DaemonSet)
+    # kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/main/deployments/static/nvidia-device-plugin.yml
+
+---
+# EC2NodeClass: Ubuntu
+# Para workloads que requerem Ubuntu
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: ubuntu
+spec:
+  # Ubuntu 22.04 LTS
+  amiFamily: Ubuntu2204
+
+  role: KarpenterNodeRole
+
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: my-cluster
+        tier: private
+
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: my-cluster
+
+  blockDeviceMappings:
+    - deviceName: /dev/sda1  # Ubuntu usa /dev/sda1 ao invés de /dev/xvda
+      ebs:
+        volumeSize: 100Gi
+        volumeType: gp3
+        iops: 3000
+        throughput: 125
+        encrypted: true
+        deleteOnTermination: true
+
+  tags:
+    OS: ubuntu
+    Version: "22.04"
+    ManagedBy: karpenter
+
+  metadataOptions:
+    httpEndpoint: enabled
+    httpProtocolIPv6: disabled
+    httpPutResponseHopLimit: 2
+    httpTokens: required
+
+  # User data para Ubuntu
+  userData: |
+    #!/bin/bash
+    set -euo pipefail
+
+    # Atualizar pacotes
+    apt-get update
+
+    # Instalar ferramentas de monitoramento
+    apt-get install -y sysstat iotop htop
+
+    # Configurar kubelet
+    mkdir -p /etc/systemd/system/kubelet.service.d
+    cat > /etc/systemd/system/kubelet.service.d/30-karpenter.conf <<EOF
+    [Service]
+    Environment="KUBELET_EXTRA_ARGS=--max-pods=110"
+    EOF
+
+---
+# EC2NodeClass: Arm64
+# Instâncias Graviton (ARM) para economia de custos
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: arm64
+spec:
+  # Amazon Linux 2023 para ARM64
+  amiFamily: AL2023
+
+  # Seletor específico para AMI ARM64 (opcional)
+  # amiSelectorTerms:
+  #   - id: ami-arm64-specific
+
+  role: KarpenterNodeRole
+
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: my-cluster
+        tier: private
+
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: my-cluster
+
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 100Gi
+        volumeType: gp3
+        iops: 3000
+        throughput: 125
+        encrypted: true
+        deleteOnTermination: true
+
+  tags:
+    Architecture: arm64
+    Processor: graviton
+    CostOptimized: "true"
+    ManagedBy: karpenter
+
+  metadataOptions:
+    httpEndpoint: enabled
+    httpProtocolIPv6: disabled
+    httpPutResponseHopLimit: 2
+    httpTokens: required
+
+  userData: |
+    #!/bin/bash
+    set -euo pipefail
+
+    # Verificar arquitetura
+    uname -m  # Deve retornar aarch64
+
+    # Instalar ferramentas
+    yum install -y htop sysstat
+
+    # Configurar kubelet
+    echo 'KUBELET_EXTRA_ARGS="--max-pods=110"' >> /etc/sysconfig/kubelet

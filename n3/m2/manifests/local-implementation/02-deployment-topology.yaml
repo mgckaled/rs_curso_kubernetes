@@ -1,0 +1,148 @@
+# Deployment com Topology Spread Constraints
+# Demonstra distribuição uniforme de pods entre zonas
+# Aplicar: kubectl apply -f 02-deployment-topology.yaml
+# Verificar: kubectl get pods -n karpenter-demo -o wide
+# Observar: Pods distribuídos uniformemente entre zone-a, zone-b, zone-c
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # Nome do deployment
+  name: demo-api-topology
+  # Namespace onde será criado
+  namespace: karpenter-demo
+  # Labels do deployment
+  labels:
+    app: demo-api
+    version: topology
+    scenario: topology-spread
+
+spec:
+  # Número de réplicas
+  # 6 réplicas / 3 zonas = 2 pods por zona
+  replicas: 6
+
+  # Seletor de pods gerenciados por este deployment
+  selector:
+    matchLabels:
+      app: demo-api
+      version: topology
+
+  # Template do pod
+  template:
+    metadata:
+      # Labels do pod
+      # Devem corresponder ao selector acima
+      labels:
+        app: demo-api
+        version: topology
+        tier: application
+
+    spec:
+      # Topology Spread Constraints
+      # Controla como pods são distribuídos entre domínios de topologia
+      topologySpreadConstraints:
+        # Constraint 1: Distribuir entre zonas
+        - maxSkew: 1
+          # maxSkew: Diferença máxima de pods entre domínios
+          # 1 = permite no máximo 1 pod de diferença entre zonas
+          # Exemplo válido: zone-a=2, zone-b=2, zone-c=2 (skew=0)
+          # Exemplo válido: zone-a=3, zone-b=2, zone-c=2 (skew=1)
+          # Exemplo inválido: zone-a=4, zone-b=2, zone-c=2 (skew=2)
+
+          topologyKey: topology.kubernetes.io/zone
+          # topologyKey: Label usada para definir domínios de topologia
+          # Nós com mesmo valor são considerados do mesmo domínio
+          # Exemplo: zone-a, zone-b, zone-c são domínios diferentes
+
+          whenUnsatisfiable: DoNotSchedule
+          # whenUnsatisfiable: O que fazer quando constraint não pode ser satisfeita
+          # DoNotSchedule: Pod fica Pending (rígido)
+          # ScheduleAnyway: Tenta respeitar mas agenda mesmo assim (flexível)
+
+          labelSelector:
+            # labelSelector: Quais pods considerar no cálculo de skew
+            # Apenas pods com estas labels são contados
+            matchLabels:
+              app: demo-api
+              version: topology
+
+        # Constraint 2: Preferir distribuir entre nós (opcional)
+        - maxSkew: 2
+          # Permite mais flexibilidade (maxSkew maior)
+          topologyKey: kubernetes.io/hostname
+          # Distribuir entre nós individuais
+          whenUnsatisfiable: ScheduleAnyway
+          # Preferencial, não obrigatório
+          labelSelector:
+            matchLabels:
+              app: demo-api
+              version: topology
+
+      # Containers do pod
+      containers:
+        - name: demo-api
+          # Imagem (ajustar conforme seu registry)
+          image: demo-api:latest
+          # Política de pull de imagem
+          imagePullPolicy: IfNotPresent
+
+          # Portas expostas
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          # Resource requests e limits
+          # Importante para scheduling correto
+          resources:
+            requests:
+              # Recursos mínimos garantidos
+              cpu: 100m       # 0.1 CPU core
+              memory: 128Mi   # 128 MiB de RAM
+            limits:
+              # Recursos máximos permitidos
+              cpu: 500m       # 0.5 CPU core
+              memory: 512Mi   # 512 MiB de RAM
+
+          # Liveness probe (verifica se pod está vivo)
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            # Aguardar 30s antes de iniciar probes
+            initialDelaySeconds: 30
+            # Intervalo entre probes
+            periodSeconds: 10
+            # Timeout por probe
+            timeoutSeconds: 5
+            # Falhas consecutivas para considerar unhealthy
+            failureThreshold: 3
+
+          # Readiness probe (verifica se pod está pronto para tráfego)
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # Variáveis de ambiente
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3000"
+            - name: APP_NAME
+              value: "demo-api-topology"
+
+      # Restart policy
+      restartPolicy: Always
+
+      # DNS policy
+      dnsPolicy: ClusterFirst
+
+      # Termination grace period (tempo para graceful shutdown)
+      terminationGracePeriodSeconds: 30

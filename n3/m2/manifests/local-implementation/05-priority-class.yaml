@@ -1,0 +1,153 @@
+# Priority Classes
+# Define prioridades relativas para scheduling e preempção de pods
+# Aplicar: kubectl apply -f 05-priority-class.yaml
+# Verificar: kubectl get priorityclasses
+# Usar no pod: spec.priorityClassName: high-priority
+
+# Priority Class: High Priority
+# Para workloads críticos de produção
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  # Nome da priority class
+  name: high-priority
+
+# value: Valor de prioridade (quanto maior, mais prioritário)
+# Range: -2147483648 a 1000000000
+# Valores acima de 1 bilhão são reservados para componentes do sistema
+value: 1000000
+# Prioridade alta (1 milhão)
+
+# globalDefault: Se true, é a prioridade padrão para pods sem priorityClassName
+globalDefault: false
+# Não é default (pods devem especificar explicitamente)
+
+# description: Descrição da classe
+description: "Workloads críticos de produção que requerem máxima prioridade"
+
+# preemptionPolicy: Política de preempção
+# PreemptLowerPriority: Pode preemptar (remover) pods de menor prioridade
+# Never: Nunca preempta outros pods
+preemptionPolicy: PreemptLowerPriority
+# Permite preemptar pods de menor prioridade se necessário
+
+# Cenários de uso:
+# - APIs críticas de produção
+# - Serviços de pagamento
+# - Sistemas de autenticação
+# - Workloads com SLA rigoroso
+
+---
+# Priority Class: Medium Priority (Default)
+# Para workloads padrão
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: medium-priority
+
+value: 1000
+# Prioridade média (mil)
+
+globalDefault: true
+# Esta é a prioridade DEFAULT
+# Pods sem priorityClassName usarão esta classe
+
+description: "Workloads padrão de aplicações regulares"
+
+preemptionPolicy: PreemptLowerPriority
+# Pode preemptar apenas low-priority
+
+# Cenários de uso:
+# - Aplicações web normais
+# - APIs não-críticas
+# - Serviços de background
+# - Workloads sem requisitos especiais de prioridade
+
+---
+# Priority Class: Low Priority
+# Para workloads não-críticos e batch jobs
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: low-priority
+
+value: 100
+# Prioridade baixa (cem)
+
+globalDefault: false
+
+description: "Jobs batch, processamento não-crítico, workloads tolerantes a interrupção"
+
+preemptionPolicy: Never
+# Nunca preempta outros pods
+# Pode ser preemptado por high e medium priority
+
+# Cenários de uso:
+# - Jobs de processamento batch
+# - Treinamento de ML não-urgente
+# - Análise de dados offline
+# - Tarefas de manutenção
+# - Workloads que podem ser interrompidos e retomados
+
+# Como funciona a preempção:
+#
+# Cenário 1: Recursos suficientes
+# - Todos pods são agendados normalmente
+# - Prioridade não importa
+#
+# Cenário 2: Recursos insuficientes
+# Cluster: 4 CPUs totais
+# Rodando: 4x pods low-priority (1 CPU cada) = 4 CPUs usadas
+# Novo pod: high-priority (precisa 2 CPUs)
+#
+# Ação do Scheduler:
+# 1. Identifica que não há recursos livres
+# 2. Verifica se novo pod tem prioridade maior
+# 3. Seleciona 2 pods low-priority para preemptar
+# 4. Envia SIGTERM para os 2 pods (graceful shutdown)
+# 5. Aguarda terminationGracePeriodSeconds
+# 6. Se não terminarem, envia SIGKILL (force kill)
+# 7. Libera recursos
+# 8. Agenda o pod high-priority
+#
+# Resultado:
+# - 2x pods low-priority terminados (e reescalados depois)
+# - 1x pod high-priority rodando
+# - 2x pods low-priority ainda rodando
+
+# Exemplo de uso em Pod:
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: critical-api
+# spec:
+#   priorityClassName: high-priority
+#   containers:
+#     - name: api
+#       image: api:v1
+
+# Exemplo de uso em Deployment:
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: batch-job
+# spec:
+#   template:
+#     spec:
+#       priorityClassName: low-priority
+#       containers:
+#         - name: worker
+#           image: worker:v1
+
+# Melhores práticas:
+# 1. Use high-priority apenas para workloads REALMENTE críticos
+#    - Muitos pods high-priority anulam o propósito
+# 2. Configure PodDisruptionBudgets para low-priority
+#    - Evita preempção de TODOS pods simultaneamente
+# 3. Combine com resource requests corretos
+#    - Scheduler precisa de requests para calcular capacidade
+# 4. Teste preempção em ambiente não-produção
+#    - Verifique comportamento de graceful shutdown
+# 5. Monitor eventos de preempção
+#    - kubectl get events | grep Preempt

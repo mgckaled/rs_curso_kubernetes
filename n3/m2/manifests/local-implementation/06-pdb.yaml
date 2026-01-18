@@ -1,0 +1,212 @@
+# PodDisruptionBudgets (PDB)
+# Garante disponibilidade mínima durante disrupções voluntárias
+# Aplicar: kubectl apply -f 06-pdb.yaml
+# Verificar: kubectl get pdb -n karpenter-demo
+# Testar: kubectl drain <node> (respeitará o PDB)
+
+# PDB: Topology Deployment
+# Protege pods do deployment com topology spread
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: demo-api-topology-pdb
+  namespace: karpenter-demo
+  labels:
+    app: demo-api
+    version: topology
+
+spec:
+  # minAvailable: Mínimo de pods que devem permanecer disponíveis
+  # Pode ser número absoluto ou porcentagem
+  minAvailable: 4
+  # De 6 réplicas, mínimo 4 devem estar disponíveis
+  # Máximo 2 pods podem ser disruptados simultaneamente
+
+  # OU usar maxUnavailable (escolher um dos dois)
+  # maxUnavailable: 2
+  # Máximo 2 pods podem estar indisponíveis simultaneamente
+
+  # selector: Seleciona pods protegidos por este PDB
+  selector:
+    matchLabels:
+      app: demo-api
+      version: topology
+
+# O que é disrupção VOLUNTÁRIA:
+# - kubectl drain (manutenção de nó)
+# - kubectl delete pod
+# - Deployment rollout (update de imagem)
+# - Node eviction (cluster autoscaler)
+# - Karpenter consolidation
+#
+# O que NÃO é disrupção voluntária (PDB não protege):
+# - Falha de hardware
+# - Kernel panic
+# - OOMKilled
+# - Pod crash (bug na aplicação)
+# - Network partition
+
+---
+# PDB: Affinity Deployment
+# Protege pods com node affinity
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: demo-api-affinity-pdb
+  namespace: karpenter-demo
+  labels:
+    app: demo-api
+    version: affinity
+
+spec:
+  # Usar porcentagem ao invés de número absoluto
+  minAvailable: 70%
+  # Mínimo 70% dos pods devem estar disponíveis
+  # Se tiver 3 réplicas: 70% = 2.1 = arredonda para 3 (sempre arredonda para cima)
+  # Portanto, TODOS pods devem estar disponíveis (não pode drenar nenhum)
+
+  selector:
+    matchLabels:
+      app: demo-api
+      version: affinity
+
+# Quando usar porcentagem vs número absoluto:
+# - Porcentagem: Quando número de réplicas varia (HPA)
+# - Absoluto: Quando número de réplicas é fixo
+
+---
+# PDB: Anti-Affinity Deployment
+# Protege pods com anti-affinity (alta disponibilidade)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: demo-api-anti-affinity-pdb
+  namespace: karpenter-demo
+  labels:
+    app: demo-api
+    version: anti-affinity
+
+spec:
+  # maxUnavailable: Máximo que pode estar indisponível
+  maxUnavailable: 1
+  # De 3 réplicas, máximo 1 pode estar indisponível
+  # Mínimo 2 devem estar sempre disponíveis (67% uptime)
+
+  selector:
+    matchLabels:
+      app: demo-api
+      version: anti-affinity
+
+# unhealthyPodEvictionPolicy: Como tratar pods não saudáveis
+# IfHealthyBudget: Evict apenas se budget for respeitado (default)
+# AlwaysAllow: Sempre permite eviction de pods não saudáveis
+unhealthyPodEvictionPolicy: IfHealthyBudget
+
+# Como PDB funciona:
+
+# Exemplo 1: Drain de nó
+# Cluster: 3 workers
+# Deployment: 6 réplicas
+# PDB: minAvailable: 4
+#
+# Ação: kubectl drain worker-1
+# Comportamento:
+# 1. Worker-1 tem 2 pods
+# 2. Kubernetes tenta evict os 2 pods
+# 3. PDB verifica: 6 - 2 = 4 (ok, >= minAvailable)
+# 4. Permite eviction
+# 5. Pods são movidos para outros workers
+# 6. Drain completa com sucesso
+
+# Exemplo 2: Drain bloqueado por PDB
+# Deployment: 3 réplicas
+# PDB: minAvailable: 3
+#
+# Ação: kubectl drain worker-1
+# Comportamento:
+# 1. Worker-1 tem 1 pod
+# 2. Kubernetes tenta evict o pod
+# 3. PDB verifica: 3 - 1 = 2 (falha, < minAvailable)
+# 4. BLOQUEIA eviction
+# 5. Drain fica travado
+# 6. Erro: "Cannot evict pod as it would violate the pod's disruption budget"
+#
+# Solução:
+# - Aumentar número de réplicas temporariamente
+# - Ajustar PDB (minAvailable: 2)
+# - Usar --disable-eviction (força drain, perigoso)
+
+# Exemplo 3: Rolling Update
+# Deployment: 6 réplicas, maxSurge: 1, maxUnavailable: 1
+# PDB: minAvailable: 5
+#
+# Comportamento:
+# 1. Cria 1 novo pod (surge) = 7 pods total
+# 2. Aguarda novo pod ficar Ready
+# 3. Termina 1 pod antigo = 6 pods
+# 4. PDB verifica: 6 >= 5 (ok)
+# 5. Repete até todos pods atualizados
+# 6. Update completa respeitando PDB
+
+# Verificar status do PDB:
+# kubectl get pdb -n karpenter-demo
+#
+# Output:
+# NAME                          MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS   AGE
+# demo-api-topology-pdb         4               N/A               2                     5m
+# demo-api-affinity-pdb         70%             N/A               0                     5m
+# demo-api-anti-affinity-pdb    N/A             1                 1                     5m
+#
+# ALLOWED DISRUPTIONS: Quantos pods podem ser disruptados AGORA
+# - Se 0: Não pode drenar nenhum pod
+# - Se 2: Pode drenar até 2 pods simultaneamente
+
+# Descrever PDB para detalhes:
+# kubectl describe pdb demo-api-topology-pdb -n karpenter-demo
+#
+# Output:
+# Status:
+#   Current:              6    (pods saudáveis agora)
+#   Desired:              4    (minAvailable configurado)
+#   Disruptions Allowed:  2    (pode disruptar 6-4=2 pods)
+#   Expected Pods:        6    (total de pods no selector)
+# Events:
+#   Type    Reason             Age   From               Message
+#   Normal  CalculateExpected  10s   disruption-budget  Calculated expected pods: 6
+
+# Melhores práticas:
+
+# 1. Sempre configure PDB para aplicações críticas
+pdb_required_for:
+  - Databases
+  - Caches (Redis, Memcached)
+  - Message queues (RabbitMQ, Kafka)
+  - APIs críticas
+  - Stateful applications
+
+# 2. Escolha valores adequados
+good_values:
+  # Deployment de 5 réplicas
+  - minAvailable: 3  # 60% uptime
+  - maxUnavailable: 2  # Pode atualizar 2 por vez
+
+bad_values:
+  # Deployment de 3 réplicas
+  - minAvailable: 3  # Impede qualquer drain (100%)
+  - maxUnavailable: 0  # Impede qualquer disrupção
+
+# 3. Combine com HPA
+# Se deployment usa HPA (auto-scaling):
+# - Use PORCENTAGEM ao invés de número absoluto
+# - minAvailable: 80% (mantém proporção independente do número de pods)
+
+# 4. Teste antes de produção
+# Em staging:
+# - Simule drain de nós
+# - Verifique se PDB permite operação
+# - Ajuste valores se necessário
+
+# 5. Monitor eventos
+# kubectl get events -n karpenter-demo | grep DisruptionBudget
+# Identifica quando PDB está bloqueando operações

@@ -1,0 +1,133 @@
+# Karpenter Helm Chart Values
+# Versão: v1.8.0+
+# Instalação: helm install karpenter karpenter/karpenter --namespace karpenter --create-namespace --values karpenter-helm-values.yaml
+
+# Configurações globais
+settings:
+  # Nome do cluster EKS
+  clusterName: my-cluster
+
+  # Endpoint do cluster EKS
+  # Obter com: aws eks describe-cluster --name my-cluster --query "cluster.endpoint" --output text
+  clusterEndpoint: https://ABCD1234EFGH5678.gr7.us-east-1.eks.amazonaws.com
+
+  # Interrupção de instâncias spot
+  # SQS queue que recebe eventos de interrupção
+  # Karpenter usa isso para realocar pods antes da instância ser terminada
+  interruptionQueue: karpenter-my-cluster
+
+  # ARN da role do controller (IRSA - IAM Roles for Service Accounts)
+  # Essa role permite o Karpenter interagir com a API EC2
+  # Formato: arn:aws:iam::ACCOUNT_ID:role/KarpenterControllerRole-CLUSTER_NAME
+  aws:
+    # Conta AWS
+    accountId: "123456789012"
+    # Região AWS
+    defaultInstanceProfile: KarpenterNodeInstanceProfile-my-cluster
+    # Habilitar tags de descoberta
+    enablePodENI: false
+    # Habilitar ENI prefix delegation
+    enableENILimitedPodDensity: true
+    # Isolate pods usando security groups
+    isolatedVPC: false
+    # Node group para componentes críticos (CoreDNS, metrics-server)
+    nodeNameConvention: "ip-name"
+    # Tags aplicadas a todas as instâncias EC2
+    tags:
+      Environment: production
+      ManagedBy: karpenter
+      Team: platform
+
+# Service Account para o controller
+serviceAccount:
+  # Criar service account
+  create: true
+  # Nome do service account
+  name: karpenter
+  # Annotations para IRSA
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/KarpenterControllerRole-my-cluster"
+
+# Deployment do controller
+replicas: 2  # Alta disponibilidade
+
+# Recursos do controller pod
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# Affinity e tolerations para o controller
+affinity:
+  # Preferir rodar em nós do node group gerenciado
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: karpenter.sh/controller
+              operator: In
+              values:
+                - "true"
+  # Evitar rodar múltiplos controllers no mesmo nó
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: karpenter
+        topologyKey: kubernetes.io/hostname
+
+# Tolerations para rodar em nós dedicados (se aplicável)
+tolerations:
+  - key: CriticalAddonsOnly
+    operator: Exists
+  - key: karpenter.sh/controller
+    operator: Exists
+    effect: NoSchedule
+
+# PodDisruptionBudget
+podDisruptionBudget:
+  name: karpenter
+  minAvailable: 1
+
+# Configurações de logging
+logLevel: info  # Opções: debug, info, error
+logEncoding: json  # Opções: json, console
+
+# Webhook configuration
+webhook:
+  enabled: true
+  port: 8443
+
+# Métricas Prometheus
+controller:
+  metrics:
+    port: 8000
+
+# Configurações adicionais
+dnsPolicy: Default
+dnsConfig: {}
+
+# Priority class para o controller
+priorityClassName: system-cluster-critical
+
+# Image registry e versão
+image:
+  repository: public.ecr.aws/karpenter/controller
+  tag: v1.8.0
+  pullPolicy: IfNotPresent
+
+# Configurações de batching
+# Agrupa múltiplos pods pendentes para provisionamento mais eficiente
+batchMaxDuration: 10s
+batchIdleDuration: 1s
+
+# Feature gates
+featureGates:
+  # Habilita NodeClass drift detection
+  drift: true
+  # Habilita spot-to-spot consolidation
+  spotToSpotConsolidation: true

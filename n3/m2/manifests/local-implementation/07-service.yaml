@@ -1,0 +1,303 @@
+# Service: ClusterIP
+# Expõe pods internamente no cluster com load balancing
+# Aplicar: kubectl apply -f 07-service.yaml
+# Verificar: kubectl get svc -n karpenter-demo
+# Testar: kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- curl http://demo-api.karpenter-demo.svc.cluster.local:3000
+
+---
+# Service para Topology Deployment
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-api-topology
+  namespace: karpenter-demo
+  labels:
+    app: demo-api
+    version: topology
+
+spec:
+  # type: Tipo de service
+  # ClusterIP: Expõe apenas internamente no cluster (default)
+  # NodePort: Expõe em porta de cada nó
+  # LoadBalancer: Provisiona load balancer externo (cloud)
+  type: ClusterIP
+
+  # clusterIP: IP interno do service
+  # None = Headless Service (sem load balancing)
+  # <vazio> = Kubernetes aloca IP automaticamente
+  # <IP específico> = Usar IP específico (deve estar no serviceSubnet)
+  # clusterIP: None  # Para StatefulSets
+  # Deixar vazio para alocação automática
+
+  # selector: Labels para selecionar pods backend
+  # Service roteia tráfego para pods com estas labels
+  selector:
+    app: demo-api
+    version: topology
+
+  # ports: Lista de portas expostas
+  ports:
+    # Porta 1: HTTP
+    - name: http
+      # protocol: TCP ou UDP
+      protocol: TCP
+      # port: Porta do service (onde clientes conectam)
+      port: 80
+      # targetPort: Porta do container (onde aplicação escuta)
+      targetPort: 3000
+      # Pode ser número ou nome da porta do container
+      # targetPort: http (se container define ports.name: http)
+
+  # sessionAffinity: Sessão sticky (mesmo cliente → mesmo pod)
+  # None: Sem afinidade, load balance aleatório (default)
+  # ClientIP: Mesmo cliente vai sempre para mesmo pod
+  sessionAffinity: None
+  # Usar ClientIP para aplicações stateful ou com sessões
+
+  # sessionAffinityConfig: Configurações de session affinity
+  # sessionAffinityConfig:
+  #   clientIP:
+  #     timeoutSeconds: 10800  # 3 horas
+
+---
+# Service para Affinity Deployment
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-api-affinity
+  namespace: karpenter-demo
+  labels:
+    app: demo-api
+    version: affinity
+
+spec:
+  type: ClusterIP
+  selector:
+    app: demo-api
+    version: affinity
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 3000
+  sessionAffinity: None
+
+---
+# Service para Anti-Affinity Deployment
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-api-anti-affinity
+  namespace: karpenter-demo
+  labels:
+    app: demo-api
+    version: anti-affinity
+  # annotations: Metadados para integrações
+  annotations:
+    # Prometheus scraping
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "3000"
+    prometheus.io/path: "/metrics"
+
+spec:
+  type: ClusterIP
+  selector:
+    app: demo-api
+    version: anti-affinity
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 3000
+    # Porta adicional: Métricas Prometheus
+    - name: metrics
+      protocol: TCP
+      port: 9090
+      targetPort: 3000
+  sessionAffinity: None
+
+  # ipFamilyPolicy: Política de IP family (IPv4, IPv6, dual-stack)
+  # SingleStack: Apenas uma família (default)
+  # PreferDualStack: Prefere dual-stack mas aceita single
+  # RequireDualStack: Requer dual-stack
+  ipFamilyPolicy: SingleStack
+
+  # ipFamilies: Famílias de IP explícitas
+  # IPv4, IPv6
+  ipFamilies:
+    - IPv4
+
+---
+# Service: Unified (para todos deployments)
+# Service único que roteia para TODOS os deployments
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-api
+  namespace: karpenter-demo
+  labels:
+    app: demo-api
+
+spec:
+  type: ClusterIP
+  # Selector seleciona TODOS pods com label app=demo-api
+  # Independente da versão (topology, affinity, anti-affinity)
+  selector:
+    app: demo-api
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 3000
+  sessionAffinity: None
+
+# Como Service funciona:
+
+# 1. DNS Resolution
+# Service cria entrada DNS automaticamente:
+# - demo-api.karpenter-demo.svc.cluster.local → ClusterIP
+# - demo-api.karpenter-demo → ClusterIP (short name)
+# - demo-api → ClusterIP (se no mesmo namespace)
+
+# 2. Load Balancing
+# Service usa iptables/IPVS para distribuir tráfego:
+#
+# Client → Service IP (10.96.x.x)
+#           ↓
+#      kube-proxy (iptables rules)
+#           ↓
+#      Round-robin entre pods
+#           ↓
+#      Pod 1: 10.244.1.5:3000
+#      Pod 2: 10.244.2.8:3000
+#      Pod 3: 10.244.3.12:3000
+
+# 3. Endpoints
+# Service mantém lista de endpoints (pods) dinamicamente:
+# kubectl get endpoints demo-api -n karpenter-demo
+#
+# Output:
+# NAME        ENDPOINTS                                         AGE
+# demo-api    10.244.1.5:3000,10.244.2.8:3000,10.244.3.12:3000  5m
+
+# Se pod morre ou fica NotReady:
+# - Automaticamente removido dos endpoints
+# - Tráfego não é mais roteado para ele
+
+# 4. Session Affinity (Sticky Sessions)
+# Com sessionAffinity: ClientIP:
+#
+# Request 1: Cliente A (IP: 192.168.1.100) → Pod 1
+# Request 2: Cliente A (IP: 192.168.1.100) → Pod 1 (mesmo pod)
+# Request 3: Cliente B (IP: 192.168.1.101) → Pod 2
+# Request 4: Cliente A (IP: 192.168.1.100) → Pod 1 (ainda mesmo pod)
+#
+# Útil para aplicações com estado em memória (sessões HTTP, websockets)
+
+# Testar Service:
+
+# Teste 1: DNS resolution
+# kubectl run -it --rm debug --image=busybox --restart=Never -n karpenter-demo -- nslookup demo-api
+#
+# Output:
+# Server:    10.96.0.10
+# Address 1: 10.96.0.10 kube-dns.kube-system.svc.cluster.local
+# Name:      demo-api
+# Address 1: 10.96.52.137 demo-api.karpenter-demo.svc.cluster.local
+
+# Teste 2: HTTP request
+# kubectl run -it --rm debug --image=curlimages/curl --restart=Never -n karpenter-demo -- \
+#   curl http://demo-api:80/
+#
+# Output: Response da aplicação
+
+# Teste 3: Verificar endpoints
+# kubectl get endpoints demo-api -n karpenter-demo -o yaml
+#
+# Output:
+# subsets:
+#   - addresses:
+#       - ip: 10.244.1.5
+#         nodeName: worker-1
+#         targetRef:
+#           kind: Pod
+#           name: demo-api-topology-abc123
+#       - ip: 10.244.2.8
+#         nodeName: worker-2
+#         targetRef:
+#           kind: Pod
+#           name: demo-api-topology-def456
+
+# Teste 4: Load balancing
+# kubectl run -it --rm debug --image=curlimages/curl --restart=Never -n karpenter-demo -- sh -c \
+#   'for i in $(seq 1 10); do curl -s http://demo-api:80/ | grep -o "hostname.*"; done'
+#
+# Output: Diferentes pods respondendo (load balancing)
+# hostname: demo-api-topology-abc123
+# hostname: demo-api-topology-def456
+# hostname: demo-api-topology-abc123
+# hostname: demo-api-affinity-ghi789
+# ...
+
+# Tipos de Service:
+
+# ClusterIP (este arquivo)
+# - Expõe apenas internamente
+# - Padrão para comunicação intra-cluster
+# - Usa: APIs internas, databases, caches
+
+# NodePort
+# type: NodePort
+# ports:
+#   - port: 80
+#     targetPort: 3000
+#     nodePort: 30080  # Porta em cada nó (30000-32767)
+# - Expõe em porta de TODOS os nós
+# - Acesso: <NodeIP>:30080
+# - Usa: Ambientes sem LoadBalancer (on-prem)
+
+# LoadBalancer
+# type: LoadBalancer
+# - Provisiona load balancer externo (cloud)
+# - Obtém IP público
+# - Usa: Expor aplicação para internet
+
+# ExternalName
+# type: ExternalName
+# externalName: api.example.com
+# - Cria CNAME para serviço externo
+# - Não tem selector, ports, clusterIP
+# - Usa: Integração com serviços externos
+
+# Headless Service
+# clusterIP: None
+# - Sem load balancing
+# - DNS retorna IPs de TODOS pods
+# - Usa: StatefulSets, descoberta de pods
+
+# Melhores práticas:
+
+# 1. Usar nomes significativos
+# - demo-api-topology (específico por versão)
+# - demo-api (agregado para todas versões)
+
+# 2. Definir múltiplas portas quando necessário
+# ports:
+#   - name: http
+#     port: 80
+#   - name: https
+#     port: 443
+#   - name: metrics
+#     port: 9090
+
+# 3. Usar annotations para integrações
+# annotations:
+#   prometheus.io/scrape: "true"
+#   service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+
+# 4. Monitor endpoints
+# kubectl get endpoints -w -n karpenter-demo
+# Identifica pods sendo adicionados/removidos
+
+# 5. Testar DNS e conectividade
+# Sempre validar que service está roteando corretamente

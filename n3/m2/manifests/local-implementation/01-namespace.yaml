@@ -1,0 +1,32 @@
+# Namespace: karpenter-demo
+# Isola recursos de demonstração em um namespace dedicado
+# Aplicar: kubectl apply -f 01-namespace.yaml
+# Verificar: kubectl get namespaces
+# Deletar: kubectl delete namespace karpenter-demo
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  # Nome do namespace
+  name: karpenter-demo
+
+  # Labels do namespace
+  # Úteis para organização e seleção
+  labels:
+    # Indicar ambiente
+    environment: learning
+    # Indicar propósito
+    purpose: demonstration
+    # Indicar módulo do curso
+    module: n3-m2-karpenter
+    # Indicar que recursos podem ser deletados sem impacto
+    safe-to-delete: "true"
+
+  # Annotations para metadados adicionais
+  annotations:
+    # Descrição do namespace
+    description: "Namespace para demonstração de conceitos Karpenter e scheduling avançado"
+    # Versão do curso
+    course-version: "v1.0"
+    # Data de criação
+    created-by: "kubernetes-course"

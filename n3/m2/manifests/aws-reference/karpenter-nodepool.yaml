@@ -1,0 +1,380 @@
+# Karpenter NodePools - Exemplos para diferentes workloads
+# Aplicar com: kubectl apply -f karpenter-nodepool.yaml
+
+---
+# NodePool: Production
+# Workloads críticos com alta disponibilidade
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: production
+spec:
+  # Referência à NodeClass
+  template:
+    spec:
+      # Referência à EC2NodeClass
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+
+      # Requisitos de nós para este pool
+      requirements:
+        # Tipo de capacidade: apenas on-demand (sem spot)
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+
+        # Arquitetura: apenas amd64
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+
+        # Tipos de instância permitidos (família m5 e c5)
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+            - m5.large
+            - m5.xlarge
+            - m5.2xlarge
+            - c5.large
+            - c5.xlarge
+            - c5.2xlarge
+
+        # Zonas de disponibilidade
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values:
+            - us-east-1a
+            - us-east-1b
+            - us-east-1c
+
+      # Taints aplicados aos nós deste pool
+      # Apenas pods com toleration correspondente podem agendar aqui
+      taints:
+        - key: workload-type
+          value: production
+          effect: NoSchedule
+
+      # Labels aplicados aos nós
+      labels:
+        environment: production
+        managed-by: karpenter
+        nodepool: production
+
+  # Limites de capacidade total do pool
+  limits:
+    cpu: "1000"      # Máximo 1000 CPUs totais
+    memory: 1000Gi   # Máximo 1000 GiB de memória
+
+  # Peso para priorização (maior = maior prioridade)
+  # Usado quando múltiplos NodePools podem atender um pod
+  weight: 100
+
+  # Políticas de disruption (consolidação e expiração)
+  disruption:
+    # Quando consolidar nós
+    # WhenUnderutilized: consolida quando nó está subutilizado (default)
+    # WhenEmpty: consolida apenas quando nó está vazio
+    consolidationPolicy: WhenUnderutilized
+
+    # Tempo de espera antes de consolidar nó subutilizado
+    consolidateAfter: 5m
+
+    # TTL do nó (tempo máximo de vida)
+    # Após 30 dias, nó é substituído automaticamente
+    expireAfter: 720h  # 30 dias
+
+    # Budgets de disruption
+    # Limita quantos nós podem ser disruptados simultaneamente
+    budgets:
+      # Máximo 5% dos nós podem ser disruptados por vez
+      - nodes: 5%
+        reasons:
+          - Underutilized
+          - Empty
+        # Apenas em horário comercial
+        schedule: "0 9-17 * * MON-FRI"
+
+---
+# NodePool: Spot
+# Workloads tolerantes a interrupções (dev, staging, batch)
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: spot
+spec:
+  template:
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+
+      requirements:
+        # Tipo de capacidade: spot (com fallback para on-demand)
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot", "on-demand"]
+
+        # Múltiplas arquiteturas para mais disponibilidade
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64", "arm64"]
+
+        # Famílias de instância (t3, t3a, t4g)
+        # Mais opções = mais chance de conseguir spot
+        - key: karpenter.k8s.aws/instance-family
+          operator: In
+          values:
+            - t3
+            - t3a
+            - t4g
+            - m5
+            - m5a
+            - m6i
+
+        # Evitar instâncias muito grandes
+        - key: karpenter.k8s.aws/instance-size
+          operator: NotIn
+          values:
+            - nano
+            - micro
+            - small
+            - 12xlarge
+            - 16xlarge
+            - 24xlarge
+
+      labels:
+        environment: staging
+        capacity-type: spot
+        managed-by: karpenter
+        nodepool: spot
+
+  limits:
+    cpu: "500"
+    memory: 500Gi
+
+  weight: 50  # Menor prioridade que production
+
+  disruption:
+    consolidationPolicy: WhenUnderutilized
+    # Consolidação mais agressiva (30 segundos)
+    consolidateAfter: 30s
+    # Rotacionar nós mais frequentemente (7 dias)
+    expireAfter: 168h  # 7 dias
+    budgets:
+      # Permite disruptar até 10% dos nós simultaneamente
+      - nodes: 10%
+
+---
+# NodePool: Batch
+# Jobs de processamento em lote (ML training, data processing)
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: batch
+spec:
+  template:
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+
+      requirements:
+        # Apenas spot (economia máxima)
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot"]
+
+        # Qualquer arquitetura
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64", "arm64"]
+
+        # Instâncias otimizadas para computação
+        - key: karpenter.k8s.aws/instance-family
+          operator: In
+          values:
+            - c5
+            - c5a
+            - c5n
+            - c6i
+            - c6a
+            - m5
+            - m5a
+            - r5
+            - r5a
+
+        # Geração mínima (evitar instâncias antigas)
+        - key: karpenter.k8s.aws/instance-generation
+          operator: Gt
+          values: ["4"]
+
+      # Taints para isolar batch jobs
+      taints:
+        - key: workload-type
+          value: batch
+          effect: NoSchedule
+
+      labels:
+        workload-type: batch
+        capacity-type: spot
+        managed-by: karpenter
+        nodepool: batch
+
+  limits:
+    cpu: "2000"     # Permite escalar muito
+    memory: 2000Gi
+
+  weight: 10  # Baixa prioridade
+
+  disruption:
+    # Apenas quando vazio (batch jobs são grandes)
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 10s
+    # Sem expiração (jobs controlam ciclo de vida)
+    expireAfter: Never
+    budgets:
+      # Permite disruptar 50% simultaneamente (batch tolera)
+      - nodes: 50%
+
+---
+# NodePool: GPU
+# Workloads que requerem GPU (ML inference, rendering)
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: gpu
+spec:
+  template:
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: gpu  # NodeClass específica para GPU
+
+      requirements:
+        # On-demand (GPUs são caras, evitar interrupção spot)
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+
+        # Apenas amd64 (GPUs não suportam arm64)
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+
+        # Tipos de instância com GPU
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+            - g4dn.xlarge
+            - g4dn.2xlarge
+            - g4dn.4xlarge
+            - p3.2xlarge
+            - p3.8xlarge
+
+        # Label específica para GPU
+        - key: karpenter.k8s.aws/instance-gpu-name
+          operator: Exists
+
+      taints:
+        # Prevenir workloads sem GPU de agendarem aqui
+        - key: nvidia.com/gpu
+          value: "true"
+          effect: NoSchedule
+
+      labels:
+        workload-type: gpu
+        accelerator: nvidia
+        managed-by: karpenter
+        nodepool: gpu
+
+  limits:
+    cpu: "200"
+    memory: 500Gi
+    # Limite de GPUs (8 GPUs totais)
+    nvidia.com/gpu: "8"
+
+  weight: 200  # Alta prioridade
+
+  disruption:
+    # Nunca consolidar (GPUs são caras de reprovisionar)
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: Never
+    # Rotação lenta (90 dias)
+    expireAfter: 2160h  # 90 dias
+    budgets:
+      # Máximo 1 nó GPU por vez
+      - nodes: "1"
+
+---
+# NodePool: Monitoring
+# Componentes de monitoramento (Prometheus, Grafana)
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: monitoring
+spec:
+  template:
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+
+      requirements:
+        # On-demand (monitoramento crítico)
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+
+        # Instâncias otimizadas para memória
+        # Prometheus consome muita RAM
+        - key: karpenter.k8s.aws/instance-family
+          operator: In
+          values:
+            - r5
+            - r5a
+            - r6i
+            - m5
+            - m5a
+
+        # Tamanhos adequados
+        - key: karpenter.k8s.aws/instance-size
+          operator: In
+          values:
+            - large
+            - xlarge
+            - 2xlarge
+
+      taints:
+        - key: workload-type
+          value: monitoring
+          effect: NoSchedule
+
+      labels:
+        workload-type: monitoring
+        managed-by: karpenter
+        nodepool: monitoring
+
+  limits:
+    cpu: "100"
+    memory: 500Gi
+
+  weight: 90
+
+  disruption:
+    # Consolidação conservadora
+    consolidationPolicy: WhenUnderutilized
+    consolidateAfter: 10m
+    expireAfter: 720h  # 30 dias
+    budgets:
+      # Máximo 1 nó por vez (evitar perda de métricas)
+      - nodes: "1"

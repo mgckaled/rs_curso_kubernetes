@@ -1,0 +1,160 @@
+# Deployment com Node Affinity
+# Demonstra preferências e restrições de nós para scheduling
+# Aplicar: kubectl apply -f 03-deployment-affinity.yaml
+# Verificar: kubectl get pods -n karpenter-demo -l version=affinity -o wide
+# Observar: Pods agendados preferencialmente em nós on-demand com SSD
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-api-affinity
+  namespace: karpenter-demo
+  labels:
+    app: demo-api
+    version: affinity
+    scenario: node-affinity
+
+spec:
+  replicas: 3
+
+  selector:
+    matchLabels:
+      app: demo-api
+      version: affinity
+
+  template:
+    metadata:
+      labels:
+        app: demo-api
+        version: affinity
+        tier: application
+
+    spec:
+      # Affinity: Define regras de afinidade (atração) e anti-afinidade (repulsão)
+      affinity:
+        # Node Affinity: Regras baseadas em labels dos nós
+        nodeAffinity:
+          # Regra OBRIGATÓRIA (hard requirement)
+          # Pod NÃO será agendado se nenhum nó satisfizer
+          requiredDuringSchedulingIgnoredDuringExecution:
+            # nodeSelectorTerms: Lista de termos (OR lógico)
+            # Pelo menos UM termo deve ser satisfeito
+            nodeSelectorTerms:
+              # Termo 1: Nó deve atender TODAS as expressões (AND lógico)
+              - matchExpressions:
+                  # Expressão 1: Tipo de capacidade
+                  - key: karpenter.sh/capacity-type
+                    # Operador In: Valor deve estar na lista
+                    operator: In
+                    values:
+                      - on-demand
+                      # Aceita também on-demand (não spot)
+                      # Spot instances podem ser interrompidas
+
+                  # Expressão 2: Zona (excluir zone-c)
+                  - key: topology.kubernetes.io/zone
+                    # Operador NotIn: Valor NÃO deve estar na lista
+                    operator: NotIn
+                    values:
+                      - zone-c
+                      # Evita agendar em zone-c
+                      # Pode ser usado para manutenção, isolamento, etc.
+
+          # Regra PREFERENCIAL (soft preference)
+          # Pod será agendado mesmo se não satisfizer, mas prefere que satisfaça
+          # Múltiplas preferências são somadas por peso
+          preferredDuringSchedulingIgnoredDuringExecution:
+            # Preferência 1: Preferir nós com SSD (peso 80)
+            - weight: 80
+              # weight: Peso da preferência (1-100)
+              # Scheduler soma pesos de todas preferências satisfeitas
+              # Nó com maior soma tem prioridade
+              preference:
+                matchExpressions:
+                  - key: disk-type
+                    operator: In
+                    values:
+                      - ssd
+                      # Preferir SSD sobre HDD para melhor performance
+
+            # Preferência 2: Preferir zona A (peso 50)
+            - weight: 50
+              preference:
+                matchExpressions:
+                  - key: topology.kubernetes.io/zone
+                    operator: In
+                    values:
+                      - zone-a
+                      # Preferir zone-a (pode ter latência menor, etc.)
+
+            # Preferência 3: Preferir família t3 (peso 30)
+            - weight: 30
+              preference:
+                matchExpressions:
+                  - key: karpenter.k8s.aws/instance-family
+                    operator: In
+                    values:
+                      - t3
+                      # Preferir instâncias t3 (burstable, custo-efetivas)
+
+      containers:
+        - name: demo-api
+          image: demo-api:latest
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3000"
+            - name: APP_NAME
+              value: "demo-api-affinity"
+
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+      terminationGracePeriodSeconds: 30
+
+# Operadores disponíveis:
+# - In: Valor deve estar na lista
+# - NotIn: Valor NÃO deve estar na lista
+# - Exists: Label deve existir (ignora valores)
+# - DoesNotExist: Label NÃO deve existir
+# - Gt: Maior que (para valores numéricos)
+# - Lt: Menor que (para valores numéricos)
+
+# Exemplo de cálculo de scores:
+# Nó A: zone-a (50), disk-type=ssd (80), family=t3 (30) = 160 pontos
+# Nó B: zone-b (0), disk-type=ssd (80), family=t3 (30) = 110 pontos
+# Nó C: zone-b (0), disk-type=hdd (0), family=c5 (0) = 0 pontos
+# Scheduler prefere Nó A

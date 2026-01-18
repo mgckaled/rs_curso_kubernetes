@@ -1,0 +1,165 @@
+# Deployment com Pod Anti-Affinity
+# Demonstra como evitar co-localização de pods (alta disponibilidade)
+# Aplicar: kubectl apply -f 04-deployment-anti-affinity.yaml
+# Verificar: kubectl get pods -n karpenter-demo -l version=anti-affinity -o custom-columns=NAME:.metadata.name,NODE:.spec.nodeName
+# Observar: Cada pod em nó diferente (máximo 3 pods para 3 workers)
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-api-anti-affinity
+  namespace: karpenter-demo
+  labels:
+    app: demo-api
+    version: anti-affinity
+    scenario: pod-anti-affinity
+
+spec:
+  # Apenas 3 réplicas pois temos 3 workers
+  # Com anti-affinity obrigatória, mais réplicas ficariam Pending
+  replicas: 3
+
+  selector:
+    matchLabels:
+      app: demo-api
+      version: anti-affinity
+
+  template:
+    metadata:
+      labels:
+        app: demo-api
+        version: anti-affinity
+        tier: application
+        # Label para identificar criticidade
+        criticality: high
+
+    spec:
+      affinity:
+        # Pod Anti-Affinity: Evita pods no mesmo domínio de topologia
+        # Útil para alta disponibilidade (evitar single point of failure)
+        podAntiAffinity:
+          # Regra OBRIGATÓRIA (hard anti-affinity)
+          # Pod NÃO será agendado se violar a regra
+          requiredDuringSchedulingIgnoredDuringExecution:
+            # Lista de termos de anti-affinity
+            # Cada termo define pods a evitar e domínio de topologia
+            - labelSelector:
+                # labelSelector: Seleciona pods a evitar
+                # Neste caso, evitar outros pods da mesma aplicação
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - demo-api
+                  - key: version
+                    operator: In
+                    values:
+                      - anti-affinity
+                      # Evita pods com mesmas labels
+
+              # topologyKey: Define o domínio de "separação"
+              # kubernetes.io/hostname = cada nó é um domínio
+              # Resultado: Máximo 1 pod por nó
+              topologyKey: kubernetes.io/hostname
+              # Outras opções:
+              # - topology.kubernetes.io/zone = 1 pod por zona
+              # - topology.kubernetes.io/region = 1 pod por região
+
+          # Regra PREFERENCIAL (soft anti-affinity)
+          # Tenta evitar mas agenda mesmo se não conseguir
+          preferredDuringSchedulingIgnoredDuringExecution:
+            # Preferência 1: Evitar mesma zona (peso 100)
+            - weight: 100
+              # weight: Importância da preferência (1-100)
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: demo-api
+                    version: anti-affinity
+                # Preferir não agendar na mesma zona
+                topologyKey: topology.kubernetes.io/zone
+
+        # Node Affinity adicional
+        # Combinar com anti-affinity para controle fino
+        nodeAffinity:
+          # Preferir nós on-demand (mais estáveis)
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              preference:
+                matchExpressions:
+                  - key: karpenter.sh/capacity-type
+                    operator: In
+                    values:
+                      - on-demand
+
+      containers:
+        - name: demo-api
+          image: demo-api:latest
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          # Recursos: Classe Guaranteed (requests = limits)
+          # Melhor QoS para aplicação crítica
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            # Tolerância maior para aplicação crítica
+            failureThreshold: 5
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3000"
+            - name: APP_NAME
+              value: "demo-api-anti-affinity"
+            # Identificar hostname do nó
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+      terminationGracePeriodSeconds: 30
+
+# Cenários de uso:
+# 1. Alta Disponibilidade: Evitar perda de serviço por falha de nó
+# 2. Balanceamento: Distribuir carga entre múltiplos nós
+# 3. Isolamento: Evitar interferência entre pods (noise neighbor)
+# 4. Compliance: Requisitos regulatórios de separação física
+
+# Diferença: Affinity vs Anti-Affinity
+# - podAffinity: Atração (rodar PERTO de outros pods)
+#   Exemplo: Web server perto de cache para baixa latência
+# - podAntiAffinity: Repulsão (rodar LONGE de outros pods)
+#   Exemplo: Réplicas de DB em nós diferentes
+
+# Diferença: Required vs Preferred
+# - required: Hard constraint (pod fica Pending se não satisfizer)
+# - preferred: Soft preference (tenta respeitar mas agenda anyway)

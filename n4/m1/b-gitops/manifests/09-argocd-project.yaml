@@ -1,0 +1,84 @@
+# =============================================================================
+# AppProject - Projeto basico no Argo CD
+# Nivel 4 - Modulo 1 - Aula 11
+# =============================================================================
+#
+# O AppProject e a camada de GOVERNANCA do Argo CD.
+# Agrupa Applications logicamente e define LIMITES do que pode ser feito.
+#
+# Analogia simples:
+#   - Pense em Projects como "departamentos" de uma empresa
+#   - Cada departamento tem acesso apenas a seus proprios recursos
+#   - Um Project define: quais repos, quais clusters, quais namespaces
+#
+# O project "default" permite TUDO (sem restricoes).
+# Em producao, voce deve criar Projects customizados com restricoes.
+#
+# Este manifest cria um Project com restricoes MODERADAS:
+#   - Permite apenas repositorios da organizacao mgckaled
+#   - Permite deploy apenas no cluster local
+#   - Permite deploy apenas nos namespaces demo-app e staging
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  # Nome do Project
+  name: demo-project
+  # DEVE estar no namespace do Argo CD
+  namespace: argocd
+  # Finalizer: garante limpeza ao deletar o Project
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Descricao do projeto (aparece na UI)
+  description: "Projeto didatico para demonstracao de GitOps com Argo CD"
+
+  # -------------------------------------------------
+  # SOURCE REPOS: quais repositorios Git sao permitidos
+  # -------------------------------------------------
+  # Aceita wildcards: '*' = todos, 'https://github.com/org/*' = org inteira
+  sourceRepos:
+    # Permite apenas repositorios desta organizacao
+    - 'https://github.com/mgckaled/*'
+
+  # -------------------------------------------------
+  # DESTINATIONS: onde as Applications podem fazer deploy
+  # -------------------------------------------------
+  # Define combinacoes de cluster + namespace permitidas
+  destinations:
+    # Permite deploy no cluster local, namespace demo-app
+    - server: https://kubernetes.default.svc
+      namespace: demo-app
+    # Permite deploy no cluster local, namespace staging
+    - server: https://kubernetes.default.svc
+      namespace: staging
+
+  # -------------------------------------------------
+  # CLUSTER RESOURCE WHITELIST: recursos de cluster permitidos
+  # -------------------------------------------------
+  # Recursos "cluster-scoped" (nao pertencem a um namespace)
+  # Exemplo: Namespace, ClusterRole, ClusterRoleBinding
+  clusterResourceWhitelist:
+    # Permite criar Namespaces
+    - group: ''
+      kind: Namespace
+
+  # -------------------------------------------------
+  # NAMESPACE RESOURCE WHITELIST: recursos de namespace permitidos
+  # -------------------------------------------------
+  # Se nao definido, TODOS os recursos de namespace sao permitidos
+  # Defina para restringir o que Applications podem criar
+  namespaceResourceWhitelist:
+    # Permite Deployments
+    - group: apps
+      kind: Deployment
+    # Permite Services
+    - group: ''
+      kind: Service
+    # Permite ConfigMaps
+    - group: ''
+      kind: ConfigMap
+    # Permite Secrets
+    - group: ''
+      kind: Secret

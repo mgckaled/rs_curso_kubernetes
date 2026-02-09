@@ -1,0 +1,41 @@
+# =============================================================================
+# Configuracao do Cluster Kind - Staging (Multi-Cluster)
+# Nivel 4 - Modulo 1 - GitOps e ArgoCD - Aula 8
+# =============================================================================
+#
+# Cluster ULTRA-LEVE para simular ambiente de staging.
+# Usado na pratica de multi-cluster (aula 8):
+#   - Argo CD instalado no cluster principal (n4-m1-gitops)
+#   - Este cluster e GERENCIADO remotamente pelo Argo CD
+#   - NAO precisa ter Argo CD instalado
+#
+# Memoria estimada: ~500-700 MB (apenas control plane, sem Argo)
+#
+# IMPORTANTE: Este cluster e OPCIONAL.
+# Se sua maquina nao tiver RAM suficiente (~2.5 GB total para ambos),
+# use a Opcao B descrita no README (simulacao com namespaces).
+#
+# Uso: kind create cluster --config manifests/00-kind-cluster-staging.yaml
+# =============================================================================
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+
+# Nome do cluster staging (diferente do principal)
+name: n4-m1-staging
+
+nodes:
+  # Apenas 1 control-plane (minimo possivel)
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            cpu-manager-policy: none
+
+# Rede com configuracoes padrao (economiza recursos)
+networking:
+  disableDefaultCNI: false
+  podSubnet: "10.244.0.0/16"
+  serviceSubnet: "10.96.0.0/12"

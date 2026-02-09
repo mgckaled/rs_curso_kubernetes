@@ -1,0 +1,78 @@
+# =============================================================================
+# ConfigMap - Pagina HTML customizada para o nginx demo
+# =============================================================================
+#
+# Este ConfigMap contem o HTML que o nginx servira.
+# O Argo CD monitora este arquivo no Git.
+# Alterar a versao aqui e fazer commit e o que simula um "deploy".
+#
+# Fluxo GitOps:
+#   1. Alterar a versao neste arquivo (ex: v1 -> v2)
+#   2. Fazer commit e push
+#   3. Argo CD detecta a mudanca (~180s de polling)
+#   4. Argo CD sincroniza o ConfigMap no cluster
+#   5. Nginx serve a nova versao
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  # Nome do ConfigMap
+  name: demo-nginx
+  # Namespace da aplicacao (deve coincidir com o destino no Argo CD)
+  namespace: demo-app
+  # Labels para identificacao
+  labels:
+    app: demo-nginx
+    managed-by: argocd
+data:
+  # Chave: nome do arquivo que sera montado no nginx
+  # Valor: conteudo HTML da pagina
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Demo GitOps - Argo CD</title>
+      <style>
+        body {
+          font-family: 'Segoe UI', Arial, sans-serif;
+          background: #1a1a2e;
+          color: #eee;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 100vh;
+          margin: 0;
+        }
+        .container {
+          text-align: center;
+          background: #16213e;
+          padding: 40px;
+          border-radius: 12px;
+          border: 1px solid #0f3460;
+          max-width: 500px;
+        }
+        h1 { color: #e94560; margin-bottom: 8px; }
+        .version { font-size: 2em; color: #53cfcb; font-weight: bold; }
+        .info { color: #999; margin-top: 16px; font-size: 0.9em; }
+        .tag { background: #0f3460; padding: 4px 12px; border-radius: 4px; display: inline-block; margin: 4px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>GitOps Demo</h1>
+        <p>Aplicacao gerenciada pelo Argo CD</p>
+        <div class="version">v1</div>
+        <div class="info">
+          <span class="tag">Ambiente: producao</span>
+          <span class="tag">Gerenciado por: Argo CD</span>
+        </div>
+        <p class="info">
+          Altere a versao neste ConfigMap, faca commit e push.<br>
+          O Argo CD sincronizara automaticamente.
+        </p>
+      </div>
+    </body>
+    </html>

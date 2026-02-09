@@ -1,0 +1,77 @@
+# =============================================================================
+# Application - Primeira aplicacao gerenciada pelo Argo CD
+# =============================================================================
+#
+# O "Application" e o CRD (Custom Resource Definition) PRINCIPAL do Argo CD.
+# Ele define:
+#   - DE ONDE vem os manifests (source: repositorio Git + path)
+#   - PARA ONDE vao os recursos (destination: cluster + namespace)
+#   - COMO sincronizar (syncPolicy: manual ou automatico)
+#
+# Neste exemplo:
+#   - Source: repositorio GitHub, path "n4/m1/b-gitops/apps/demo-nginx"
+#   - Destination: cluster local (in-cluster), namespace "demo-app"
+#   - SyncPolicy: manual (para demonstrar o fluxo passo a passo)
+#
+# Fluxo:
+#   1. Argo CD detecta que Application esta OutOfSync (Git != Cluster)
+#   2. Usuario faz sync manual (UI ou CLI)
+#   3. Argo CD aplica os YAMLs no cluster
+#   4. Application fica "Synced" e "Healthy"
+# =============================================================================
+
+# API version especifica do Argo CD (nao e API nativa do Kubernetes)
+apiVersion: argoproj.io/v1alpha1
+# Tipo do recurso: Application (CRD do Argo CD)
+kind: Application
+metadata:
+  # Nome da Application (aparece na UI do Argo CD)
+  name: demo-nginx
+  # DEVE estar no namespace do Argo CD
+  namespace: argocd
+  # Labels para organizacao
+  labels:
+    project: n4-m1-gitops
+    tier: demo
+  # Finalizer: garante que ao deletar a Application,
+  # os recursos Kubernetes associados tambem sejam removidos (cascade delete)
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Project: agrupa Applications logicamente
+  # "default" e o project padrao (sem restricoes)
+  # Na aula 11, criaremos Projects customizados com restricoes
+  project: default
+
+  # SOURCE: de onde vem os manifests
+  source:
+    # URL do repositorio Git (deve estar registrado no Argo CD)
+    # IMPORTANTE: Substitua pela URL do SEU repositorio
+    repoURL: https://github.com/mgckaled/rs_curso_kubernetes.git
+    # Branch ou tag a observar (HEAD = branch padrao, geralmente main)
+    targetRevision: HEAD
+    # Path DENTRO do repositorio onde estao os YAMLs Kubernetes
+    # O Argo CD ira aplicar TODOS os .yaml encontrados neste path
+    path: n4/m1/b-gitops/apps/demo-nginx
+
+  # DESTINATION: para onde vao os recursos
+  destination:
+    # URL do cluster Kubernetes de destino
+    # "https://kubernetes.default.svc" = cluster local (in-cluster)
+    # Para clusters externos, usar a URL real
+    server: https://kubernetes.default.svc
+    # Namespace onde os recursos serao criados
+    namespace: demo-app
+
+  # SYNC POLICY: como sincronizar
+  # Comentado para comecar com sync MANUAL (aula 5)
+  # Descomentar na aula 6 para habilitar AutoSync
+  # syncPolicy:
+  #   automated:
+  #     # selfHeal: reverte mudancas manuais no cluster (corrige drift)
+  #     selfHeal: true
+  #     # prune: remove recursos do cluster que nao estao mais no Git
+  #     prune: true
+  #   syncOptions:
+  #     # Cria namespace automaticamente se nao existir
+  #     - CreateNamespace=true

@@ -1,0 +1,115 @@
+# =============================================================================
+# AppProject Restrito - RBAC avancado e Sync Windows
+# Nivel 4 - Modulo 1 - Aula 11
+# =============================================================================
+#
+# Este Project demonstra recursos avancados de governanca:
+#   1. Roles com permissoes granulares (RBAC)
+#   2. Sync Windows (janelas de sincronizacao)
+#   3. Restricoes de namespace e recursos
+#
+# Cenario simulado:
+#   - Time "backend" tem acesso somente leitura
+#   - Time "devops" tem permissao de sync
+#   - Sync bloqueado fora do horario comercial (seg-sex, 8h-18h)
+#
+# NOTA: Roles com OIDC/SSO requerem configuracao adicional do Dex.
+# Em ambiente local, as roles servem como REFERENCIA conceitual.
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: restricted-project
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: "Projeto com restricoes avancadas (RBAC + Sync Windows)"
+
+  # Repositorios permitidos (apenas desta organizacao)
+  sourceRepos:
+    - 'https://github.com/mgckaled/*'
+
+  # Destinos permitidos (apenas namespace demo-app no cluster local)
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: demo-app
+
+  # Recursos de cluster permitidos
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+
+  # -------------------------------------------------
+  # ROLES: controle de acesso granular
+  # -------------------------------------------------
+  # Formato da policy:
+  #   p, <subject>, <recurso>, <acao>, <objeto>, <efeito>
+  #
+  # Subjects: proj:<project-name>:<role-name>
+  # Recursos: applications, repositories, clusters, logs, exec
+  # Acoes: get, create, update, delete, sync, override, action/*
+  # Efeitos: allow, deny
+  roles:
+    # Role 1: Somente leitura (para desenvolvedores)
+    - name: read-only
+      description: "Permissoes de somente leitura para o time backend"
+      policies:
+        # Permite APENAS visualizar (get) Applications neste project
+        - p, proj:restricted-project:read-only, applications, get, restricted-project/*, allow
+      # Grupos OIDC/SSO que recebem esta role
+      # Em producao, mapear para grupos do provedor de identidade
+      groups:
+        - backend-team
+
+    # Role 2: Sync (para DevOps)
+    - name: sync-only
+      description: "Permissoes de sincronizacao para o time DevOps"
+      policies:
+        # Permite visualizar Applications
+        - p, proj:restricted-project:sync-only, applications, get, restricted-project/*, allow
+        # Permite sincronizar Applications
+        - p, proj:restricted-project:sync-only, applications, sync, restricted-project/*, allow
+      groups:
+        - devops-team
+
+  # -------------------------------------------------
+  # SYNC WINDOWS: janelas de sincronizacao
+  # -------------------------------------------------
+  # Controla QUANDO o sync pode acontecer
+  # Formato: tipo (allow/deny), schedule (cron), duration, clusters, namespaces, apps
+  #
+  # Exemplo pratico:
+  #   - Permitir sync apenas em horario comercial (seg-sex, 8h-18h)
+  #   - Bloquear sync nos finais de semana
+  syncWindows:
+    # Janela 1: PERMITIR sync em horario comercial
+    - kind: allow
+      # Cron: minuto hora dia-mes mes dia-semana
+      # "0 8 * * 1-5" = as 8h, de segunda a sexta
+      schedule: '0 8 * * 1-5'
+      # Duracao da janela (10 horas = 8h as 18h)
+      duration: 10h
+      # Aplicar a TODAS as Applications deste Project
+      applications:
+        - '*'
+      # Aplicar a todos os namespaces
+      namespaces:
+        - '*'
+      # Aplicar a todos os clusters
+      clusters:
+        - '*'
+
+    # Janela 2: BLOQUEAR sync nos finais de semana
+    - kind: deny
+      # "0 0 * * 0,6" = meia-noite, sabado e domingo
+      schedule: '0 0 * * 0,6'
+      # Duracao: 24 horas (dia inteiro)
+      duration: 24h
+      applications:
+        - '*'
+      namespaces:
+        - '*'
+      clusters:
+        - '*'

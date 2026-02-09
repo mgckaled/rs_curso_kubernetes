@@ -1,0 +1,30 @@
+# =============================================================================
+# Namespace dedicado para o Argo CD
+# =============================================================================
+#
+# O Argo CD exige um namespace proprio para instalar seus componentes:
+# - argocd-server (API + UI)
+# - argocd-repo-server (sincroniza repositorios Git)
+# - argocd-application-controller (gerencia Applications)
+# - argocd-redis (cache interno)
+# - argocd-dex-server (autenticacao OIDC/SSO)
+# - argocd-applicationset-controller (gera Applications automaticamente)
+# - argocd-notifications-controller (notificacoes)
+#
+# Por convencao, o namespace e chamado "argocd".
+# O manifest oficial do Argo CD espera este nome.
+# =============================================================================
+
+# Versao da API para Namespace
+apiVersion: v1
+# Tipo do recurso Kubernetes
+kind: Namespace
+metadata:
+  # Nome do namespace (convencao oficial do Argo CD)
+  name: argocd
+  # Labels para identificacao e organizacao
+  labels:
+    # Identifica que este namespace pertence ao projeto GitOps
+    project: n4-m1-gitops
+    # Identifica o proposito do namespace
+    purpose: continuous-delivery

@@ -1,0 +1,130 @@
+# =============================================================================
+# REFERENCIA: Workflow GitHub Actions para CI integrada ao Argo CD
+# Nivel 4 - Modulo 1 - Aula 7
+# =============================================================================
+#
+# IMPORTANTE: Este arquivo e apenas REFERENCIA/DOCUMENTACAO.
+# Ele NAO e executavel localmente.
+# Para simular o fluxo CI localmente, use: bash scripts/03-simulate-ci.sh
+#
+# Este workflow demonstra o fluxo completo de CI + GitOps:
+#   1. Codigo e alterado (push na branch main)
+#   2. CI executa: build, testes, gera imagem Docker
+#   3. CI atualiza o YAML do Kubernetes com a nova tag
+#   4. CI faz commit automatico do YAML atualizado
+#   5. Argo CD detecta a mudanca no Git e sincroniza
+#
+# Fluxo visual:
+#   Codigo -> CI (build+push) -> Git (YAML atualizado) -> Argo CD -> Cluster
+# =============================================================================
+
+name: CI - Build and Update Manifest
+
+# Trigger: executa quando ha push na branch main
+# APENAS em arquivos de codigo (ignora manifests para evitar loop infinito)
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'        # Apenas mudancas no codigo fonte
+      - 'package.json'  # Ou mudancas em dependencias
+
+# Variaveis de ambiente globais
+env:
+  # Nome da imagem Docker (substitua pelo seu)
+  IMAGE_NAME: usuario/demo-api
+  # Registry (Docker Hub neste exemplo)
+  REGISTRY: docker.io
+
+jobs:
+  build-and-update:
+    runs-on: ubuntu-latest
+
+    steps:
+      # -------------------------------------------------
+      # ETAPA 1: Checkout do codigo
+      # -------------------------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # -------------------------------------------------
+      # ETAPA 2: Setup do ambiente (Node.js neste exemplo)
+      # -------------------------------------------------
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      # -------------------------------------------------
+      # ETAPA 3: Instalar dependencias
+      # -------------------------------------------------
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # -------------------------------------------------
+      # ETAPA 4: Executar testes
+      # Se os testes falharem, o pipeline PARA aqui
+      # Nenhuma imagem e gerada, nenhum deploy acontece
+      # -------------------------------------------------
+      - name: Run tests
+        run: pnpm test
+
+      # -------------------------------------------------
+      # ETAPA 5: Gerar tag unica para a imagem
+      # Usa o SHA curto do commit (ex: abc1234)
+      # Isso garante rastreabilidade: imagem <-> commit
+      # -------------------------------------------------
+      - name: Generate image tag
+        id: tag
+        run: echo "TAG=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      # -------------------------------------------------
+      # ETAPA 6: Login no registry (Docker Hub)
+      # Credenciais armazenadas como GitHub Secrets
+      # -------------------------------------------------
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # -------------------------------------------------
+      # ETAPA 7: Build e push da imagem Docker
+      # Gera DUAS tags: SHA do commit + latest
+      # -------------------------------------------------
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.TAG }}
+            ${{ env.IMAGE_NAME }}:latest
+
+      # -------------------------------------------------
+      # ETAPA 8: Atualizar manifest Kubernetes com nova tag
+      # Este e o passo CHAVE do GitOps:
+      # - Atualiza o campo "image" no deployment.yaml
+      # - Faz commit automatico
+      # - Argo CD detecta a mudanca e sincroniza
+      #
+      # IMPORTANTE: Este commit NAO dispara o workflow novamente
+      # porque o trigger filtra apenas 'src/**' e 'package.json'
+      # (evita loop infinito)
+      # -------------------------------------------------
+      - name: Update Kubernetes manifest
+        uses: fjogeleit/yaml-update-action@main
+        with:
+          # Caminho do arquivo YAML a atualizar
+          valueFile: 'n4/m1/b-gitops/apps/demo-nginx/deployment.yaml'
+          # Campo a atualizar (JSONPath)
+          propertyPath: 'spec.template.spec.containers[0].image'
+          # Novo valor (registry/imagem:tag)
+          value: '${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.TAG }}'
+          # Branch de destino
+          branch: main
+          # Mensagem do commit automatico
+          commitChange: true
+          message: 'ci: update image tag to ${{ steps.tag.outputs.TAG }}'

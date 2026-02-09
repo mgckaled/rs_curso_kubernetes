@@ -1,0 +1,59 @@
+# =============================================================================
+# Configuracao do Cluster Kind - Projeto GitOps com Argo CD
+# Nivel 4 - Modulo 1 - GitOps e ArgoCD
+# =============================================================================
+#
+# Cluster OTIMIZADO para maquinas com recursos limitados:
+# - 1 Control Plane node APENAS (sem workers)
+# - Argo CD roda diretamente no control plane
+# - Sem CNI customizado (usa padrao Kind para economizar)
+#
+# Memoria estimada: ~600-800 MB (apenas control plane)
+# Com Argo CD instalado: ~1.4-2.0 GB total
+#
+# Uso: kind create cluster --config manifests/00-kind-cluster.yaml
+# =============================================================================
+
+# Versao da API do Kind
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+
+# Nome do cluster (identificador unico para este projeto)
+name: n4-m1-gitops
+
+# Definicao dos nos do cluster
+nodes:
+  # Control Plane Node (unico node do cluster)
+  # Responsavel por: etcd, kube-apiserver, kube-scheduler, kube-controller-manager
+  # Todos os pods (incluindo Argo CD) rodam aqui
+  - role: control-plane
+
+    # Configuracoes extras do kubeadm para otimizar recursos
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            # Desabilita gerenciamento avancado de CPU (economiza recursos)
+            cpu-manager-policy: none
+
+    # Mapeia portas do host para o container do Kind
+    # Permite acessar servicos do cluster via localhost
+    extraPortMappings:
+      # Porta 8080 -> NodePort 30080 (Argo CD UI via port-forward)
+      - containerPort: 30080
+        hostPort: 30080
+        protocol: TCP
+      # Porta 80 -> NodePort 30000 (app demo nginx)
+      - containerPort: 30000
+        hostPort: 30000
+        protocol: TCP
+
+# Configuracoes de rede do cluster
+networking:
+  # Usa CNI padrao do Kind (kindnet) - mais leve que Calico/Flannel
+  disableDefaultCNI: false
+  # Range de IPs para pods (formato CIDR)
+  podSubnet: "10.244.0.0/16"
+  # Range de IPs para services (formato CIDR)
+  serviceSubnet: "10.96.0.0/12"

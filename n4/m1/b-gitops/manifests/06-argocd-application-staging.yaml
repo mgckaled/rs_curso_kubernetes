@@ -1,0 +1,60 @@
+# =============================================================================
+# Application - Deploy no cluster staging (Multi-Cluster)
+# Nivel 4 - Modulo 1 - Aula 8
+# =============================================================================
+#
+# Esta Application e identica a 05-argocd-application.yaml,
+# mas o DESTINATION aponta para o cluster STAGING ao inves do local.
+#
+# Isso demonstra o modelo 1:1 do Argo CD:
+#   - 1 Application = 1 deploy em 1 cluster
+#   - Para N clusters, precisamos de N Applications
+#   - Problema: nao escala bem
+#   - Solucao: ApplicationSet (aula 9)
+#
+# PRE-REQUISITO: cluster staging criado e registrado no Argo CD
+#   bash scripts/02-setup-staging.sh
+#
+# IMPORTANTE:
+#   Substitua <STAGING-CLUSTER-URL> pela URL real do cluster staging.
+#   O script 02-setup-staging.sh exibe esta URL ao final.
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-nginx-staging
+  namespace: argocd
+  labels:
+    project: n4-m1-gitops
+    tier: demo
+    environment: staging
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  # SOURCE: mesma origem que a Application de producao
+  source:
+    repoURL: https://github.com/mgckaled/rs_curso_kubernetes.git
+    targetRevision: HEAD
+    path: n4/m1/b-gitops/apps/demo-nginx
+
+  # DESTINATION: aponta para o cluster STAGING
+  destination:
+    # URL do cluster staging
+    # IMPORTANTE: Substitua pela URL real obtida com:
+    #   argocd cluster list
+    # Exemplo: https://172.18.0.3:6443
+    server: https://STAGING-CLUSTER-URL:6443
+    # Namespace no cluster staging
+    namespace: demo-app
+
+  # Sync automatico para staging (mais permissivo que producao)
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    syncOptions:
+      # Cria namespace automaticamente no cluster staging
+      - CreateNamespace=true

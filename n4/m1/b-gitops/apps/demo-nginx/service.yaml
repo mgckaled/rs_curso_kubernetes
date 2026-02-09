@@ -1,0 +1,42 @@
+# =============================================================================
+# Service - Expoe a aplicacao nginx demo
+# =============================================================================
+#
+# Service do tipo ClusterIP que expoe o nginx na porta 80.
+# Para acessar localmente, use port-forward:
+#   kubectl port-forward svc/demo-nginx -n demo-app 8081:80
+#   Acesse: http://localhost:8081
+#
+# O Argo CD gerencia este Service junto com o Deployment e ConfigMap.
+# Todos os 3 recursos formam a "aplicacao" observada pelo Argo CD.
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  # Nome do Service
+  name: demo-nginx
+  # Namespace (deve coincidir com o Deployment)
+  namespace: demo-app
+  # Labels para identificacao
+  labels:
+    app: demo-nginx
+    managed-by: argocd
+spec:
+  # Tipo ClusterIP: acessivel apenas dentro do cluster
+  # Para acessar de fora, usar port-forward ou NodePort
+  type: ClusterIP
+
+  # Seletor: direciona trafego para pods com estas labels
+  # Deve coincidir com as labels do Deployment
+  selector:
+    app: demo-nginx
+
+  # Portas expostas pelo Service
+  ports:
+    - name: http
+      # Porta do Service (usada no port-forward)
+      port: 80
+      # Porta do container de destino
+      targetPort: 80
+      protocol: TCP

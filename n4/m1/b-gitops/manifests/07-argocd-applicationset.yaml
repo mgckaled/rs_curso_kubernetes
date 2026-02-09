@@ -1,0 +1,93 @@
+# =============================================================================
+# ApplicationSet - Deploy automatico em multiplos clusters
+# Nivel 4 - Modulo 1 - Aula 9
+# =============================================================================
+#
+# O ApplicationSet e um CRD do Argo CD que GERA multiplas Applications
+# automaticamente a partir de um TEMPLATE + GENERATOR.
+#
+# Analogia simples:
+#   - Generator = lista de valores (como um "for each")
+#   - Template = modelo de Application com variaveis {{}}
+#   - Resultado = 1 Application para cada item da lista
+#
+# Neste exemplo:
+#   - Generator "list" com 2 clusters: prod e staging
+#   - Template gera 2 Applications: demo-nginx-prod e demo-nginx-staging
+#   - Ambas apontam para o mesmo path no Git
+#   - Cada uma faz deploy no seu cluster de destino
+#
+# IMPORTANTE:
+#   Substitua as URLs dos clusters pelas URLs reais.
+#   Use "argocd cluster list" para obter as URLs.
+#
+# DICA: Antes de aplicar, REMOVA as Applications individuais (05 e 06)
+#   para evitar conflitos. O ApplicationSet substitui ambas.
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  # Nome do ApplicationSet
+  name: demo-nginx-multicluster
+  # DEVE estar no namespace do Argo CD
+  namespace: argocd
+spec:
+  # -------------------------------------------------
+  # GENERATOR: define a lista de valores
+  # Tipo "list": lista fixa de elementos
+  # Cada elemento e um conjunto de variaveis usaveis no template
+  # -------------------------------------------------
+  generators:
+    - list:
+        elements:
+          # Elemento 1: cluster de producao (local)
+          - cluster: prod
+            # URL do cluster local (in-cluster)
+            url: https://kubernetes.default.svc
+            # Namespace de destino
+            namespace: demo-app
+
+          # Elemento 2: cluster de staging
+          - cluster: staging
+            # URL do cluster staging (substituir pela URL real)
+            # Use: argocd cluster list
+            url: https://STAGING-CLUSTER-URL:6443
+            namespace: demo-app
+
+  # -------------------------------------------------
+  # TEMPLATE: modelo de Application
+  # Variaveis {{nome}} sao substituidas pelos valores do generator
+  # -------------------------------------------------
+  template:
+    metadata:
+      # Nome da Application gerada (DEVE ser unico)
+      # {{cluster}} sera substituido por "prod" ou "staging"
+      # Resultado: "demo-nginx-prod" e "demo-nginx-staging"
+      name: 'demo-nginx-{{cluster}}'
+    spec:
+      # Project padrao (sem restricoes)
+      project: default
+
+      # Source: mesma origem para todos os clusters
+      source:
+        repoURL: https://github.com/mgckaled/rs_curso_kubernetes.git
+        targetRevision: HEAD
+        path: n4/m1/b-gitops/apps/demo-nginx
+
+      # Destination: varia por cluster (usa variaveis do generator)
+      destination:
+        # {{url}} sera substituido pela URL do cluster
+        server: '{{url}}'
+        # {{namespace}} sera substituido pelo namespace
+        namespace: '{{namespace}}'
+
+      # Sync automatico com auto-correcao
+      syncPolicy:
+        automated:
+          # selfHeal: reverte mudancas manuais no cluster
+          selfHeal: true
+          # prune: remove recursos que nao estao mais no Git
+          prune: true
+        syncOptions:
+          - CreateNamespace=true

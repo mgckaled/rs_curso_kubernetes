@@ -1,0 +1,83 @@
+# =============================================================================
+# Deployment - Aplicacao nginx demo para GitOps
+# =============================================================================
+#
+# Deployment simples com nginx:alpine servindo uma pagina HTML customizada.
+# Este e o recurso principal que o Argo CD gerencia.
+#
+# Resources otimizados:
+# - Requests: 32Mi RAM, 50m CPU (garantido)
+# - Limits: 64Mi RAM, 100m CPU (maximo)
+# - Consumo real: ~5-10 Mi RAM
+#
+# O Argo CD monitora este arquivo no Git e aplica mudancas automaticamente.
+# =============================================================================
+
+# Versao da API para Deployments
+apiVersion: apps/v1
+# Tipo do recurso
+kind: Deployment
+metadata:
+  # Nome do Deployment
+  name: demo-nginx
+  # Namespace de destino (deve existir antes do deploy)
+  namespace: demo-app
+  # Labels para identificacao
+  labels:
+    app: demo-nginx
+    managed-by: argocd
+spec:
+  # Numero de replicas (pods identicos)
+  # Para demonstracao, 1 replica e suficiente
+  replicas: 1
+
+  # Seletor: define quais pods pertencem a este Deployment
+  # Deve coincidir com os labels do template
+  selector:
+    matchLabels:
+      app: demo-nginx
+
+  # Template do pod
+  template:
+    metadata:
+      # Labels aplicadas a cada pod criado
+      labels:
+        app: demo-nginx
+    spec:
+      containers:
+        - name: nginx
+          # Imagem leve do nginx (~40 MB)
+          # Tag fixa para controle de versao (nao usar :latest em GitOps)
+          image: nginx:1.27-alpine
+
+          # Portas expostas pelo container
+          ports:
+            - containerPort: 80
+              protocol: TCP
+
+          # Recursos computacionais
+          resources:
+            # Requests: recursos GARANTIDOS ao pod
+            requests:
+              cpu: 50m       # 5% de 1 core
+              memory: 32Mi   # 32 MB reservados
+            # Limits: maximo que o pod pode consumir
+            limits:
+              cpu: 100m      # 10% de 1 core
+              memory: 64Mi   # 64 MB maximo
+
+          # Monta o ConfigMap como arquivo HTML
+          volumeMounts:
+            - name: html-content
+              # Caminho onde o nginx serve arquivos estaticos
+              mountPath: /usr/share/nginx/html/index.html
+              # subPath: monta apenas o arquivo, nao substitui o diretorio inteiro
+              subPath: index.html
+              readOnly: true
+
+      # Volumes disponiveis para os containers
+      volumes:
+        - name: html-content
+          configMap:
+            # Nome do ConfigMap que contem o HTML
+            name: demo-nginx

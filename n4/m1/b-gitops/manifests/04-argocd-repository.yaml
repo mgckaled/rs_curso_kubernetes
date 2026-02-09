@@ -1,0 +1,43 @@
+# =============================================================================
+# Secret - Configuracao do Repositorio Git no Argo CD
+# =============================================================================
+#
+# O Argo CD precisa saber QUAL repositorio Git observar.
+# Para repositorios PUBLICOS, basta informar a URL HTTPS.
+# Para repositorios PRIVADOS, seria necessario SSH key ou token.
+#
+# Este Secret registra o repositorio no Argo CD.
+# Alternativa: configurar via UI (Settings -> Repositories -> Connect Repo)
+#
+# IMPORTANTE: Em GitOps, ate a configuracao do Argo CD deve estar no Git.
+# Por isso usamos YAML ao inves de configurar apenas pela UI.
+# =============================================================================
+
+apiVersion: v1
+kind: Secret
+metadata:
+  # Nome do Secret (pode ser qualquer nome descritivo)
+  name: repo-rs-curso-kubernetes
+  # DEVE estar no namespace do Argo CD
+  namespace: argocd
+  # Labels OBRIGATORIAS para o Argo CD reconhecer este Secret como repositorio
+  labels:
+    argocd.argoproj.io/secret-type: repository
+# Tipo Opaque: dados genericos (padrao para Secrets)
+type: Opaque
+# Dados em texto puro (Kubernetes codifica automaticamente em base64)
+stringData:
+  # Tipo de conexao: git
+  type: git
+  # URL do repositorio (HTTPS para repositorio publico)
+  # IMPORTANTE: Substitua pela URL do SEU repositorio
+  url: https://github.com/mgckaled/rs_curso_kubernetes.git
+  # Para repositorio publico, nao precisa de credenciais
+  # Para repositorio privado, adicionar:
+  #   username: seu-usuario
+  #   password: seu-token-pessoal (GitHub Personal Access Token)
+  # Ou usar SSH:
+  #   sshPrivateKey: |
+  #     -----BEGIN OPENSSH PRIVATE KEY-----
+  #     ...conteudo da chave...
+  #     -----END OPENSSH PRIVATE KEY-----

@@ -1,0 +1,183 @@
+# =============================================================================
+# Patches de Resource Limits para Argo CD
+# =============================================================================
+#
+# O manifest oficial do Argo CD (install.yaml) NAO define resource limits.
+# Em maquinas com RAM limitada (2.5 GB), isso pode causar consumo excessivo.
+#
+# Este arquivo contem patches para aplicar APOS a instalacao do Argo CD.
+# Cada patch reduz requests e limits de um componente especifico.
+#
+# Aplicar com: kubectl patch deployment <nome> -n argocd --patch-file <arquivo>
+# Ou usar o script: bash scripts/01-setup-cluster.sh (aplica automaticamente)
+#
+# TOTAL estimado: requests ~416 Mi / limits ~1408 Mi
+# =============================================================================
+
+---
+# -------------------------------------------------
+# Patch: argocd-server (API + UI Web)
+# Responsavel por servir a interface web e a API REST
+# -------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-server
+  namespace: argocd
+spec:
+  template:
+    spec:
+      containers:
+        - name: argocd-server
+          resources:
+            # Requests: recursos GARANTIDOS ao pod
+            requests:
+              cpu: 50m       # 5% de 1 core
+              memory: 64Mi   # 64 MB de RAM reservados
+            # Limits: maximo que o pod pode consumir
+            limits:
+              cpu: 250m      # 25% de 1 core
+              memory: 256Mi  # 256 MB maximo
+
+---
+# -------------------------------------------------
+# Patch: argocd-repo-server (Sincronizacao de repositorios)
+# Responsavel por clonar repositorios Git e gerar manifests
+# -------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-repo-server
+  namespace: argocd
+spec:
+  template:
+    spec:
+      containers:
+        - name: argocd-repo-server
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+
+---
+# -------------------------------------------------
+# Patch: argocd-application-controller (Gerencia Applications)
+# Componente PRINCIPAL: monitora cluster e Git, reconcilia divergencias
+# Precisa de mais recursos que os outros componentes
+# -------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-application-controller
+  namespace: argocd
+spec:
+  template:
+    spec:
+      containers:
+        - name: argocd-application-controller
+          resources:
+            requests:
+              cpu: 100m      # 10% de 1 core
+              memory: 128Mi  # 128 MB reservados
+            limits:
+              cpu: 500m      # 50% de 1 core
+              memory: 512Mi  # 512 MB maximo (maior componente)
+
+---
+# -------------------------------------------------
+# Patch: argocd-redis (Cache em memoria)
+# Armazena cache de estado das aplicacoes e repositorios
+# Consumo estavel e previsivel
+# -------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-redis
+  namespace: argocd
+spec:
+  template:
+    spec:
+      containers:
+        - name: redis
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 150m
+              memory: 128Mi
+
+---
+# -------------------------------------------------
+# Patch: argocd-dex-server (Autenticacao OIDC/SSO)
+# Gerencia integracao com provedores de identidade
+# Em ambiente local de estudo, consumo e minimo
+# -------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-dex-server
+  namespace: argocd
+spec:
+  template:
+    spec:
+      containers:
+        - name: dex
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+
+---
+# -------------------------------------------------
+# Patch: argocd-applicationset-controller (Gera Applications)
+# Cria multiplas Applications a partir de ApplicationSets
+# Consumo baixo: ativado apenas quando ApplicationSets existem
+# -------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-applicationset-controller
+  namespace: argocd
+spec:
+  template:
+    spec:
+      containers:
+        - name: argocd-applicationset-controller
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
+---
+# -------------------------------------------------
+# Patch: argocd-notifications-controller (Notificacoes)
+# Envia notificacoes sobre mudancas de estado
+# Em ambiente local, consumo e minimo
+# -------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-notifications-controller
+  namespace: argocd
+spec:
+  template:
+    spec:
+      containers:
+        - name: argocd-notifications-controller
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi

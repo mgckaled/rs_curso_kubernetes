@@ -1,0 +1,23 @@
+# =============================================================================
+# Namespace para a aplicacao demo (nginx)
+# =============================================================================
+#
+# Namespace dedicado para a aplicacao de demonstracao.
+# O Argo CD ira sincronizar os recursos do Git para este namespace.
+#
+# Separar a aplicacao do Argo CD em namespaces diferentes e uma boa pratica:
+# - Isolamento de recursos
+# - Facilita controle de acesso (RBAC)
+# - Permite definir quotas e limits por namespace
+# =============================================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  # Nome do namespace da aplicacao demo
+  name: demo-app
+  labels:
+    # Identifica o projeto
+    project: n4-m1-gitops
+    # Identifica que este namespace contem aplicacoes gerenciadas pelo Argo CD
+    managed-by: argocd
